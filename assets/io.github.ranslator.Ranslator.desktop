@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Ranslator
+GenericName=Screen Translator
+Comment=Translate selected text and words on your screen
+Exec=ranslator
+Icon=io.github.ranslator.Ranslator
+Terminal=false
+Categories=Utility;Translation;
+Keywords=translate;translation;OCR;Ollama;screen;
+StartupWMClass=ranslator
+Actions=Background;
+
+[Desktop Action Background]
+Name=Start in tray
+Exec=ranslator --background

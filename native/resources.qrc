@@ -1,0 +1,16 @@
+<RCC><qresource prefix="/design">
+  <file alias="app-icon.svg">../assets/io.github.ranslator.Ranslator.svg</file>
+  <file alias="tray-icon.svg">../assets/icons/tray.svg</file>
+  <file alias="InterVariable.ttf">../assets/fonts/InterVariable.ttf</file>
+  <file alias="OFL.txt">../assets/fonts/OFL.txt</file>
+  <file alias="chevron.svg">../assets/icons/chevron.svg</file>
+  <file alias="check.svg">../assets/icons/check.svg</file>
+  <file alias="chevron-up.svg">../assets/icons/chevron-up.svg</file>
+  <file alias="fonts/NotoSansArabic.ttf">../assets/fonts/noto/NotoSansArabic.ttf</file>
+  <file alias="fonts/NotoSansBengali.ttf">../assets/fonts/noto/NotoSansBengali.ttf</file>
+  <file alias="fonts/NotoSansCJK-Regular.ttc">../assets/fonts/noto/NotoSansCJK-Regular.ttc</file>
+  <file alias="fonts/NotoSansDevanagari.ttf">../assets/fonts/noto/NotoSansDevanagari.ttf</file>
+  <file alias="fonts/NotoSansHebrew.ttf">../assets/fonts/noto/NotoSansHebrew.ttf</file>
+  <file alias="fonts/NotoSansThai.ttf">../assets/fonts/noto/NotoSansThai.ttf</file>
+</qresource></RCC>
+

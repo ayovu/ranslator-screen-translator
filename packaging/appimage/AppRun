@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+appdir="$(dirname "$(readlink -f "$0")")"
+export PATH="$appdir/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$appdir/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$appdir/usr/plugins/platforms"
+export RANSLATOR_TESSDATA="$appdir/usr/share/ranslator/tessdata"
+# Use bundled Qt plugins, not the host's ABI-specific KDE platform theme plugin.
+unset QT_QPA_PLATFORMTHEME
+exec "$appdir/usr/bin/ranslator" "$@"

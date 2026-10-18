@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <title>Ranslator</title>
+  <desc>Blue glass icon adapted from the contributor-provided three-loop mark.</desc>
+  <defs>
+    <linearGradient id="tile" x1=".12" y1="0" x2=".82" y2="1">
+      <stop stop-color="#8edcff"/>
+      <stop offset=".42" stop-color="#42a8f4"/>
+      <stop offset="1" stop-color="#1759d6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".18" cy=".06" r="1">
+      <stop stop-color="#f1ffff" stop-opacity=".85"/>
+      <stop offset=".55" stop-color="#bbf0ff" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edge" x1=".2" y1="0" x2=".9" y2="1">
+      <stop stop-color="#f6feff" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#c8f3ff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#84bdff" stop-opacity=".65"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="160" y1="100" x2="860" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset=".28" stop-color="#f1fbff"/>
+      <stop offset=".65" stop-color="#c8eaff"/>
+      <stop offset="1" stop-color="#8bbcf2"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="150" y1="100" x2="900" y2="930" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity=".98"/>
+      <stop offset=".5" stop-color="#e4f7ff" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#7fb3ef" stop-opacity=".8"/>
+    </linearGradient>
+    <g id="mark">
+      <path d="M766.047 418.943 C766.047 586.272 644.046 544.362 476.717 544.362 C309.387 544.362 160.094 586.272 160.094 418.943 C160.094 251.614 295.741 115.967 463.071 115.967 C630.399 115.967 766.047 251.614 766.047 418.943 Z M344.216 418.943 C344.216 484.584 411.075 544.362 476.717 544.362 C542.359 544.362 581.925 484.584 581.925 418.943 C581.925 353.302 528.712 300.089 463.071 300.089 C397.429 300.089 344.216 353.302 344.216 418.943 Z"/>
+      <path d="M769.973 648.714 C769.973 805.739 642.688 933.033 485.674 933.033 C328.66 933.033 201.376 805.739 201.376 648.714 C201.376 491.69 319.314 544.362 476.327 544.362 C633.341 544.362 769.973 491.69 769.973 648.714 Z M374.147 648.714 C374.147 710.314 424.08 760.25 485.674 760.25 C547.269 760.25 597.202 710.314 597.202 648.714 C597.202 587.115 537.922 544.362 476.327 544.362 C414.733 544.362 374.147 587.115 374.147 648.714 Z"/>
+      <path d="M1082.312 544.234 C1082.312 711.564 946.666 847.211 779.335 847.211 C612.006 847.211 634.061 544.362 475.548 544.362 C475.548 377.032 612.006 241.258 779.335 241.258 C946.666 241.258 1082.312 376.905 1082.312 544.234 Z M842.74 544.234 C842.74 609.876 713.693 663.089 779.335 663.089 C844.977 663.089 898.19 609.876 898.19 544.234 C898.19 478.592 844.977 425.379 779.335 425.379 C713.693 425.379 842.74 478.592 842.74 544.234 Z"/>
+    </g>
+  </defs>
+  <rect x="24" y="30" width="464" height="464" rx="112" fill="#0a3897" fill-opacity=".14"/>
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#tile)"/>
+  <g>
+    <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#glow)"/>
+    <path d="M24 336C150 237 278 315 488 143V136C488 74.14 437.86 24 376 24H136C74.14 24 24 74.14 24 136Z" fill="#ffffff" fill-opacity=".055"/>
+    <path d="M39 432C164 353 354 436 488 281V376C488 437.86 437.86 488 376 488H136C94 488 58 465 39 432Z" fill="#082d9d" fill-opacity=".08"/>
+    <path d="M42 436C180 355 335 427 475 319" fill="none" stroke="#9ee9ff" stroke-opacity=".13" stroke-width="2"/>
+  </g>
+  <rect x="25.5" y="25.5" width="461" height="461" rx="110.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
+  <g transform="translate(32.4 74.2) scale(.36)" fill="#073c9c" fill-opacity=".12"><use xlink:href="#mark"/></g>
+  <g transform="translate(32.4 70.2) scale(.36)" fill="#256bb9" fill-opacity=".2"><use xlink:href="#mark"/></g>
+  <g transform="translate(32.4 67.2) scale(.36)" fill="url(#glass)" stroke="url(#rim)" stroke-width="4" stroke-linejoin="round"><use xlink:href="#mark"/></g>
+</svg>

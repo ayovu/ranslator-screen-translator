@@ -1,0 +1,8 @@
+#!/bin/sh
+export PATH="/app/bin:$PATH"
+export LD_LIBRARY_PATH="/app/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH=/app/plugins
+export QT_QPA_PLATFORM_PLUGIN_PATH=/app/plugins/platforms
+export RANSLATOR_TESSDATA=/app/share/ranslator/tessdata
+unset QT_QPA_PLATFORMTHEME
+exec /app/bin/ranslator "$@"

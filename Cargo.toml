@@ -1,0 +1,39 @@
+[package]
+name = "ranslator"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Native selection and screen translation for Linux desktops"
+repository = "https://github.com/ayovu/ranslator-screen-translator"
+license = "GPL-3.0-only"
+build = "build.rs"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "3", features = ["json"] }
+whatlang = "0.18"
+isolang = { version = "2", features = ["english_names", "list_languages"] }
+tempfile = "3"
+libc = "0.2"
+sha2 = "0.10"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+wl-clipboard-rs = "0.9.4"
+wayland-client = "0.31"
+wayland-backend = "0.3"
+wayland-scanner = "0.31"
+
+[build-dependencies]
+cmake = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[[test]]
+name = "core"
+path = "tests/core.rs"

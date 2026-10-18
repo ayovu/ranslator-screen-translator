@@ -1,0 +1,18 @@
+{
+  "linuxdeploy-aarch64.AppImage": {
+    "url": "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage",
+    "sha256": "5c1fddf96066891e829831cac0d84424690f3b22846c7f8f1bb9990a5c6c73f4"
+  },
+  "linuxdeploy-armhf.AppImage": {
+    "url": "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-armhf.AppImage",
+    "sha256": "aaf21b2b53879d71dcb56123c7141f08b4acbc0d10a389cd1b3a3b6a874f2504"
+  },
+  "linuxdeploy-i386.AppImage": {
+    "url": "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-i386.AppImage",
+    "sha256": "670f2c48a3b4bbc7c29df393f52a350385c87051165d46e3e59c7f8c87724600"
+  },
+  "linuxdeploy-x86_64.AppImage": {
+    "url": "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage",
+    "sha256": "8aea8da0f7f7039d2a2cecb14657d752a222a5e1d3825caeef186c82f751cdd1"
+  }
+}

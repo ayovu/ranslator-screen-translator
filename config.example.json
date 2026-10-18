@@ -1,0 +1,38 @@
+{
+  "preferred_language": "en",
+  "fallback_language": "es",
+  "provider": "auto",
+  "provider_profiles": {},
+  "endpoint": "",
+  "model": "",
+  "api_key": "",
+  "api_key_env": "RANSLATOR_API_KEY",
+  "cli_program": "",
+  "cli_args": [],
+  "timeout_seconds": 90,
+  "once": {
+    "sequence": "Ctrl+Alt+R",
+    "taps": 1
+  },
+  "continuous": {
+    "sequence": "Ctrl+Alt+Y",
+    "taps": 1
+  },
+  "snapshot": {
+    "sequence": "Ctrl+Alt+O",
+    "taps": 1
+  },
+  "tap_window_ms": 450,
+  "selection_delay_ms": 500,
+  "watch_clipboard": false,
+  "capture_mode": "auto",
+  "appearance": "system",
+  "reduce_transparency": false,
+  "reduce_motion": false,
+  "ocr_languages": "eng",
+  "tessdata_dir": "",
+  "cli_runtime": "custom",
+  "cli_free_only": true,
+  "popup_mode": true,
+  "snapshot_copy_text": false
+}

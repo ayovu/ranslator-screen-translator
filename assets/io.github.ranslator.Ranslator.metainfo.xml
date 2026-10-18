@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ranslator.Ranslator</id>
+  <name>Ranslator</name>
+  <summary>Translate selected text and words on your screen</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <url type="homepage">https://github.com/ayovu/ranslator-screen-translator</url>
+  <url type="bugtracker">https://github.com/ayovu/ranslator-screen-translator/issues</url>
+  <description><p>A native translator for Linux desktops. Translate text selections or capture a screenshot and select recognized words. Use local Ollama models, compatible LLM APIs, LibreTranslate, MyMemory, or a command-line runtime.</p><p>English OCR is bundled. Automatic mode prefers an installed Ollama model and otherwise uses the online MyMemory service.</p></description>
+  <launchable type="desktop-id">io.github.ranslator.Ranslator.desktop</launchable>
+  <provides><binary>ranslator</binary></provides>
+  <content_rating type="oars-1.1"/>
+  <releases><release version="0.1.0" date="2026-10-18"/></releases>
+</component>

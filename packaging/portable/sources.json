@@ -1,0 +1,58 @@
+[
+  {
+    "name": "qtbase",
+    "version": "v6.12.0",
+    "commit": "025bdad181de241e81bf853c8a2d7bf3d19261a9",
+    "url": "https://codeload.github.com/qt/qtbase/tar.gz/025bdad181de241e81bf853c8a2d7bf3d19261a9",
+    "sha256": "5045b90abc04c9403aedb2e44e1c696bf047930a6a6ca49d7242a0c139453978"
+  },
+  {
+    "name": "qtwayland",
+    "version": "v6.12.0",
+    "commit": "c4f85cd060e3e80a7d71829defac9cf5a40e8ffa",
+    "url": "https://codeload.github.com/qt/qtwayland/tar.gz/c4f85cd060e3e80a7d71829defac9cf5a40e8ffa",
+    "sha256": "359fb3b0f8e73deed0069c2b61bab6ce050993eb0e59298516d49522764c811e"
+  },
+  {
+    "name": "qtsvg",
+    "version": "v6.12.0",
+    "commit": "883a58532078d003cefef0a549bfe9f885ce41f5",
+    "url": "https://codeload.github.com/qt/qtsvg/tar.gz/883a58532078d003cefef0a549bfe9f885ce41f5",
+    "sha256": "a9f1f4d8b16ec54e2bbe96cfd2b5bcdaa153932275aa94fb76294c2d85ed3847"
+  },
+  {
+    "name": "extra-cmake-modules",
+    "version": "v6.31.0",
+    "commit": "2958379fb49c71129f119ec17f88df0b5ea21550",
+    "url": "https://codeload.github.com/KDE/extra-cmake-modules/tar.gz/2958379fb49c71129f119ec17f88df0b5ea21550",
+    "sha256": "2ecfdc6dba91eafe99bfc2f62129fdd13af02c6316c7f5f88cadb8997e298f86"
+  },
+  {
+    "name": "kwindowsystem",
+    "version": "v6.31.0",
+    "commit": "52279762ee1775eca7d03af60792f49f3dc313d4",
+    "url": "https://codeload.github.com/KDE/kwindowsystem/tar.gz/52279762ee1775eca7d03af60792f49f3dc313d4",
+    "sha256": "76f4a304858e744103f72e35a988a22f14edb4c6ea04eab6248eb0c6c1509ae7"
+  },
+  {
+    "name": "kglobalaccel",
+    "version": "v6.31.0",
+    "commit": "c8403400fb6eb24b11ab39b0c4a0c6e6de0841a0",
+    "url": "https://codeload.github.com/KDE/kglobalaccel/tar.gz/c8403400fb6eb24b11ab39b0c4a0c6e6de0841a0",
+    "sha256": "f6cd0df2a9b7e6a0e8b6f3d9a53a98eba60db946fc7472859ef9d47c01dc72f3"
+  },
+  {
+    "name": "plasma-wayland-protocols",
+    "version": "v1.23.0",
+    "commit": "c5ac4db818f4a575a6ccfe0065b73ecfaba6e93e",
+    "url": "https://codeload.github.com/KDE/plasma-wayland-protocols/tar.gz/c5ac4db818f4a575a6ccfe0065b73ecfaba6e93e",
+    "sha256": "f5b61824a9d4316a49ba5f1f3a1073eec4d551c4601a7e8bb958ed3116d02fe6"
+  },
+  {
+    "name": "wayland-protocols",
+    "version": "1.49",
+    "commit": "ee78491a237eaff9389a0ccf8680521d074407d3",
+    "url": "https://codeload.github.com/wayland-mirror/wayland-protocols/tar.gz/ee78491a237eaff9389a0ccf8680521d074407d3",
+    "sha256": "cc78a5bc9ec73ed286fa43d31ee2bd4dafed498e67833c2bef9650eff3de2363"
+  }
+]

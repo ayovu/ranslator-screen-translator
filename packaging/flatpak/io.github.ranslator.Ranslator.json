@@ -1,0 +1,43 @@
+{
+  "app-id": "io.github.ranslator.Ranslator",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "26.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "ranslator-launch",
+  "finish-args": [
+    "--share=network",
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri",
+    "--talk-name=org.freedesktop.Flatpak",
+    "--talk-name=org.a11y.Bus",
+    "--filesystem=xdg-run/at-spi:ro",
+    "--talk-name=org.kde.kglobalaccel",
+    "--talk-name=org.kde.KWin",
+    "--talk-name=org.kde.StatusNotifierWatcher",
+    "--talk-name=io.github.ranslator.Ranslator.Desktop",
+    "--own-name=io.github.ranslator.Ranslator.Integration"
+  ],
+  "modules": [
+    {
+      "name": "ranslator-bundle",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cp -a usr/. /app/",
+        "install -Dm755 ranslator-launch /app/bin/ranslator-launch",
+        "sed -i 's/Exec=ranslator/Exec=ranslator-launch/g' /app/share/applications/io.github.ranslator.Ranslator.desktop"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../../build/portable/AppDir"
+        },
+        {
+          "type": "file",
+          "path": "ranslator-launch"
+        }
+      ]
+    }
+  ]
+}

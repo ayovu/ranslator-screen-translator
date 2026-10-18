@@ -1,0 +1,38 @@
+# Qt and KDE are compiled here, never copied from the developer's distribution.
+FROM docker.io/library/ubuntu:22.04@sha256:0a9887931b0e38af2e3487ed39e29436b0535c4f3f52e57745baaf79d1898956
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential g++-12 curl ca-certificates git python3 python3-pip pkg-config \
+    patchelf file binutils fuse libfuse2 xz-utils zstd unzip gettext \
+    libgl1-mesa-dev libegl1-mesa-dev libdbus-1-dev libfontconfig1-dev \
+    libfreetype6-dev libharfbuzz-dev libicu-dev libjpeg-dev libpng-dev \
+    libssl-dev libzstd-dev libb2-dev libdouble-conversion-dev libpcre2-dev \
+    libxcb1-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-keysyms1-dev \
+    libxcb-render0-dev libxcb-render-util0-dev libxcb-shape0-dev libxcb-shm0-dev \
+    libxcb-sync-dev libxcb-xfixes0-dev libxcb-xkb-dev libxcb-icccm4-dev \
+    libxcb-image0-dev libxcb-randr0-dev libxcb-util-dev libxcb-res0-dev \
+    libxcb-xinput-dev libx11-dev libx11-xcb-dev libxext-dev libxi-dev \
+    libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev wayland-protocols \
+    libxrender-dev libinput-dev libudev-dev libvulkan-dev libgbm-dev \
+    tesseract-ocr libtesseract-dev dbus-x11 xvfb xauth desktop-file-utils \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --no-cache-dir cmake==4.1.2 ninja==1.13.0 meson==1.9.1
+ENV CC=gcc-12 CXX=g++-12 CMAKE_PREFIX_PATH=/opt/ranslator
+ENV PATH=/opt/ranslator/bin:/opt/rust/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/ranslator/lib
+ENV PKG_CONFIG_PATH=/opt/ranslator/lib/pkgconfig:/opt/ranslator/share/pkgconfig
+ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/rust
+RUN curl --fail --location --retry 3 --connect-timeout 20 \
+    https://sh.rustup.rs -o /tmp/rustup.sh && \
+    sh /tmp/rustup.sh -y --profile minimal --default-toolchain 1.99.0 && \
+    rustup component add rustfmt clippy && rm /tmp/rustup.sh
+RUN apt-get update && apt-get install --no-install-recommends -y libatspi2.0-dev && rm -rf /var/lib/apt/lists/*
+COPY packaging/portable/sources.json packaging/portable/build-dependencies.py /tmp/portable/
+RUN python3 /tmp/portable/build-dependencies.py qtbase
+RUN python3 /tmp/portable/build-dependencies.py wayland-protocols qtwayland qtsvg
+RUN python3 /tmp/portable/build-dependencies.py extra-cmake-modules plasma-wayland-protocols
+RUN python3 /tmp/portable/build-dependencies.py kwindowsystem kglobalaccel
+RUN apt-get update && apt-get install --no-install-recommends -y libwebp-dev && rm -rf /var/lib/apt/lists/*
+COPY packaging/portable/imageformats.json packaging/portable/build-imageformats.sh /tmp/portable/
+RUN bash /tmp/portable/build-imageformats.sh
+WORKDIR /src

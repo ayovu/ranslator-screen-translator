@@ -1,0 +1,7 @@
+{
+  "uuid": "ranslator@ranslator.local",
+  "name": "Ranslator Desktop Integration",
+  "description": "Native translation shortcuts, selected text and Snapshot integration for Ranslator.",
+  "shell-version": ["46"],
+  "version": 1
+}

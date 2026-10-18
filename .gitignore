@@ -1,0 +1,43 @@
+# Build output and downloaded dependencies
+/target/
+/dist/
+/build/
+/vendor/
+/.flatpak-builder/
+cmake-build-*/
+*.qm
+
+# Machine-local Cargo settings and credentials
+/.cargo/config.toml
+/.cargo/config
+/.cargo/credentials
+/.cargo/credentials.toml
+
+# Installable packages and platform build products
+*.AppImage
+*.flatpak
+*.app/
+*.dSYM/
+*.dmg
+Ranslator-*.zip
+*.pkg.tar.*
+
+# Personal profiles and secrets; keep documented examples
+/config.json
+/config.local.json
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Editor, OS and Python caches
+*.user
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+.pytest_cache/
