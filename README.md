@@ -1,7 +1,5 @@
 # Ranslator
 
-<img src="assets/io.github.ranslator.Ranslator.svg" width="88" height="88" alt="Ranslator icon" />
-
 Translate selected text or words on your screen, then keep reading where you were.
 A native Linux app with a Rust core, OCR and a floating translation popup.
 
