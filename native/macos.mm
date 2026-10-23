@@ -99,7 +99,7 @@ std::optional<Display> displayFor(QScreen *screen) {
         QRect rect(qRound(frame.origin.x), qRound(originHeight - NSMaxY(frame)),
                    qRound(frame.size.width), qRound(frame.size.height));
         if (rect == screen->geometry())
-            return Display{[native.deviceDescription[@"NSScreenNumber"] unsignedIntValue()],
+            return Display{[native.deviceDescription[@"NSScreenNumber"] unsignedIntValue],
                            rect,
                            native.backingScaleFactor};
     }
