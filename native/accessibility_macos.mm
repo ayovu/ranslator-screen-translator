@@ -89,10 +89,10 @@ class MacSelectionReader : public QObject {
                     const bool hasRange =
                         selectedRange.is(AXValueGetTypeID()) &&
                         AXValueGetType(static_cast<AXValueRef>(
-                            const_cast<void *>(selectedRange.get()))) == kAXValueCFRangeType &&
+                            const_cast<void *>(selectedRange.get()))) == kAXValueTypeCFRange &&
                         AXValueGetValue(
                             static_cast<AXValueRef>(const_cast<void *>(selectedRange.get())),
-                            kAXValueCFRangeType, &range);
+                            kAXValueTypeCFRange, &range);
                     if (hasRange &&
                         (range.location < 0 || range.length < 0 || range.length > maximumText)) {
                         status = 0;
@@ -127,7 +127,7 @@ class AccessibilitySelection::Impl {
     QTimer poll, settle;
     QString lastText, candidate;
 
-    explicit Impl(AccessibilitySelection *owner) : owner(owner) {
+    explicit Impl(AccessibilitySelection *parent) : owner(parent) {
         reader->moveToThread(&workerThread);
         QObject::connect(&workerThread, &QThread::finished, reader, &QObject::deleteLater);
         QObject::connect(
