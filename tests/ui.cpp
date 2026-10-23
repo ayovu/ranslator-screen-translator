@@ -662,7 +662,13 @@ class UiTests : public QObject {
         named(dialog, "Screen text")->click();
         auto *mode = dialog->findChild<QComboBox *>("captureMode");
         QVERIFY(mode);
+#ifdef Q_OS_MACOS
+        // macOS has no desktop screenshot service to delegate the picker mode to.
+        QCOMPARE(mode->findData("picker"), -1);
+        for (const auto &value : {"auto", "desktop", "region"}) {
+#else
         for (const auto &value : {"auto", "desktop", "region", "picker"}) {
+#endif
             mode->setCurrentIndex(mode->findData(value));
             named(dialog, "Save")->click();
             QCOMPARE(sent["config"].toObject()["capture_mode"].toString(), value);
