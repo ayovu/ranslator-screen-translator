@@ -4,6 +4,46 @@
 #include "x11.hpp"
 #include <functional>
 
+// Saved shortcuts keep Qt's portable text ("Alt+Shift+C"). macOS shows them the way the system
+// does, with modifier symbols in Apple's order: ⌃⌥⇧⌘ and then the key ("⌥⇧C").
+inline QString shortcutLabel(const QString &sequence) {
+#ifdef Q_OS_MACOS
+    if (sequence.trimmed().isEmpty())
+        return sequence;
+    QStringList parts = sequence.split('+');
+    if (sequence.endsWith("++")) {
+        parts.removeLast();
+        parts.last() = "+";
+    }
+    static const QList<QPair<QStringList, QString>> modifiers{{{"Ctrl", "Control"}, "⌃"},
+                                                              {{"Alt", "Option"}, "⌥"},
+                                                              {{"Shift"}, "⇧"},
+                                                              {{"Meta", "Super", "Cmd"}, "⌘"}};
+    static const QHash<QString, QString> keys{
+        {"Return", "↩"}, {"Enter", "⌅"},  {"Tab", "⇥"},   {"Backspace", "⌫"}, {"Del", "⌦"},
+        {"Esc", "⎋"},    {"Left", "←"},   {"Right", "→"}, {"Up", "↑"},        {"Down", "↓"},
+        {"PgUp", "⇞"},   {"PgDown", "⇟"}, {"Home", "↖"},  {"End", "↘"}};
+    QString label;
+    for (const auto &[names, symbol] : modifiers)
+        for (const auto &part : parts)
+            if (names.contains(part.trimmed(), Qt::CaseInsensitive)) {
+                label += symbol;
+                break;
+            }
+    for (const auto &part : parts) {
+        const auto key = part.trimmed();
+        bool modifier = false;
+        for (const auto &[names, symbol] : modifiers)
+            modifier |= names.contains(key, Qt::CaseInsensitive);
+        if (!modifier)
+            label += keys.value(key, key);
+    }
+    return label;
+#else
+    return sequence;
+#endif
+}
+
 // One chord, including modifier-only gestures. Repetition is configured separately.
 // The saved sequence never contains the temporary recording instructions.
 class ShortcutRecorder final : public QPushButton {
@@ -54,7 +94,8 @@ class ShortcutRecorder final : public QPushButton {
                 parts << "Meta";
             candidate = parts.join('+');
         }
-        setText(candidate.isEmpty() ? UiText::tr("Listening… Press keys") : candidate);
+        setText(candidate.isEmpty() ? UiText::tr("Listening… Press keys")
+                                    : shortcutLabel(candidate));
         update();
     }
     void end(bool accept) {
@@ -69,7 +110,7 @@ class ShortcutRecorder final : public QPushButton {
         current.clear();
         held.clear();
         finished.start();
-        setText(saved);
+        setText(label());
         setAccessibleDescription(
             UiText::tr("Activate to record a shortcut. Escape cancels recording."));
         if (stateChanged)
@@ -217,7 +258,7 @@ class ShortcutRecorder final : public QPushButton {
   public:
     ShortcutRecorder(QString sequence, std::function<void(bool)> changed, QWidget *parent = nullptr)
         : QPushButton(parent), saved(std::move(sequence)), stateChanged(std::move(changed)) {
-        setText(saved);
+        setText(label());
         setAutoDefault(false);
         setFocusPolicy(Qt::StrongFocus);
         setCursor(Qt::PointingHandCursor);
@@ -238,6 +279,13 @@ class ShortcutRecorder final : public QPushButton {
     QSize sizeHint() const override { return {260, 42}; }
     QSize minimumSizeHint() const override { return {160, 42}; }
     QString sequence() const { return saved; }
+    // An empty sequence leaves an optional action without a shortcut.
+    void clear() {
+        end(false);
+        saved.clear();
+        setText(label());
+    }
+    QString label() const { return saved.isEmpty() ? UiText::tr("Not set") : shortcutLabel(saved); }
     bool isRecording() const { return listening; }
     static ShortcutRecorder *active() { return current; }
     static bool justFinished() { return finished.isValid() && finished.elapsed() < 250; }
@@ -282,7 +330,7 @@ class ShortcutRecorder final : public QPushButton {
                 QStringList{"Ctrl", "Control", "Alt", "Shift", "Meta", "Super"}.contains(
                     part.trimmed(), Qt::CaseInsensitive);
         registeredStarted.start();
-        setText(candidate);
+        setText(shortcutLabel(candidate));
         setAccessibleDescription(UiText::tr("Release the shortcut keys to finish recording."));
         // X11/Carbon/global services can swallow Qt releases. Query the real modifier state
         // rather than finishing on activation and allowing a late KWin modifier tap through.

@@ -17,8 +17,12 @@ use std::{
 
 pub enum Event {
     Ui(Value),
+    // Sent by the Wayland selection and modifier watchers; other platforms only match them.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Selection(u64, Result<String, String>),
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Modifier(String),
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Capability(String),
     Completed(u64, Value),
     OcrCompleted(u64, Value),
@@ -102,7 +106,7 @@ struct App {
     #[cfg(target_os = "linux")]
     watcher: Option<ranslator::platform::linux::SelectionWatch>,
     focus: bool,
-    taps: [TapCounter; 3],
+    taps: [TapCounter; 4],
     shortcut_recording: bool,
     shortcut_resume_at: Option<Instant>,
     jobs: Jobs,
@@ -221,6 +225,8 @@ impl App {
             } else {
                 ListenMode::Continuous
             }),
+            // Reads what is already selected; listening modes stay as they are.
+            "translate_selection" => self.read_selection(),
             "snapshot" => {
                 self.arm(ListenMode::Off);
                 self.jobs.stop();
@@ -229,6 +235,35 @@ impl App {
                 crate::emit(json!({"type":"capture"}));
             }
             _ => (),
+        }
+    }
+    fn read_selection(&mut self) {
+        #[cfg(target_os = "linux")]
+        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+            // Data-control gives the primary selection directly; without it the native layer
+            // explains which commands still work on this desktop.
+            let tx = self.tx.clone();
+            std::thread::spawn(move || {
+                let message = match ranslator::platform::linux::read_primary() {
+                    Ok(text) => json!({"type":"selection_read", "text":text}),
+                    Err(_) => json!({"type":"read_selection_fallback"}),
+                };
+                let _ = tx.send(Event::Ui(message));
+            });
+            return;
+        }
+        crate::emit(json!({"type":"read_selection"}));
+    }
+    fn selection_read(&mut self, value: &Value) {
+        if let Some(error) = value["error"].as_str() {
+            crate::emit(json!({"type":"error", "text":error}));
+            return;
+        }
+        let text = value["text"].as_str().unwrap_or("");
+        if text.trim().is_empty() {
+            crate::emit(json!({"type":"selection_missing"}));
+        } else {
+            self.selected(text.into());
         }
     }
     fn selected(&mut self, text: String) {
@@ -258,14 +293,12 @@ impl App {
         if self.snapshot_session.is_some() {
             return;
         }
-        let action = [
-            ("once", &self.config.once),
-            ("continuous", &self.config.continuous),
-            ("snapshot", &self.config.snapshot),
-        ]
-        .into_iter()
-        .find(|(_, binding)| canonical_modifier(&binding.sequence).as_deref() == Some(chord))
-        .map(|(action, _)| action);
+        let action = self
+            .config
+            .bindings()
+            .into_iter()
+            .find(|(_, binding)| canonical_modifier(&binding.sequence).as_deref() == Some(chord))
+            .map(|(action, _)| action);
         if let Some(action) = action {
             self.shortcut(action);
         }
@@ -278,11 +311,13 @@ impl App {
         {
             return;
         }
-        let (index, binding) = match action {
-            "once" => (0, &self.config.once),
-            "continuous" => (1, &self.config.continuous),
-            "snapshot" => (2, &self.config.snapshot),
-            _ => return,
+        let bindings = self.config.bindings();
+        let Some((index, (_, binding))) = bindings
+            .iter()
+            .enumerate()
+            .find(|(_, (id, _))| *id == action)
+        else {
+            return;
         };
         // Modifier releases belong to the snapshot's multi-selection gesture on every
         // backend (X11/macOS/companion as well as KWin's separate modifier channel).
@@ -360,6 +395,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                         "ready" => {
                             app.resolved = provider::resolve_auto(&app.config);
                             app.provider_label();
+                            ocr::warm_up(&app.config);
                             #[cfg(target_os = "linux")]
                             if std::env::var_os("WAYLAND_DISPLAY").is_some() {
                                 let keys = tx.clone();
@@ -450,6 +486,8 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                                 );
                             }
                         }
+                        "selection_read" => app.selection_read(&value),
+                        "read_selection_fallback" => crate::emit(json!({"type":"read_selection"})),
                         "selection_unavailable" => {
                             if value["generation"].as_u64() == Some(app.listen_generation)
                                 && app.selection.mode != ListenMode::Off
@@ -530,6 +568,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                                     app.taps = Default::default();
                                     app.config = config;
                                     app.resolved = provider::resolve_auto(&app.config);
+                                    ocr::warm_up(&app.config);
                                     crate::emit(
                                         json!({"type":"config_saved", "config":app.config}),
                                     );
@@ -599,6 +638,37 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn translate_selection_reads_now_and_translates_only_real_text() {
+        let (tx, _) = mpsc::channel();
+        let mut app = new_app(Config::default(), tx);
+        // Translation goes to a closed local port: tests never send text to a real provider.
+        app.resolved.provider = "libretranslate".into();
+        app.resolved.endpoint = "http://127.0.0.1:9".into();
+        app.action("continuous");
+        let generation = app.listen_generation;
+        app.shortcut("translate_selection");
+        // Reading the current selection leaves an active listener untouched.
+        assert_eq!(app.selection.mode, ListenMode::Continuous);
+        assert_eq!(app.listen_generation, generation);
+        app.selection_read(&json!({"text":"   "}));
+        app.selection_read(&json!({"error":"Allow Ranslator in Accessibility."}));
+        assert_eq!(app.jobs.generation, 0);
+        app.selection_read(&json!({"text":"Bonjour tout le monde"}));
+        assert_eq!(app.jobs.generation, 1);
+    }
+
+    #[test]
+    fn disabled_translate_selection_shortcut_never_fires() {
+        let (tx, _) = mpsc::channel();
+        let mut config = Config::default();
+        config.translate_selection.sequence.clear();
+        let mut app = new_app(config, tx);
+        app.modifier("");
+        assert_eq!(app.jobs.generation, 0);
+        assert_eq!(app.selection.mode, ListenMode::Off);
+    }
 
     #[test]
     fn focused_watcher_disconnect_enables_fallback_without_accepting_own_text() {
