@@ -50,7 +50,8 @@ Objective-C++ adapters, Qt Cocoa behavior or the `.app` bundle.
 
 On the friend's Mac, build from the source archive using the Mac instructions.
 Then verify ordinary and repeated shortcuts; permission denial/grant/revocation;
-selection in Safari and a native editor; screenshot orientation and OCR; current
+selection in Safari and a native editor; screenshot orientation and OCR with both
+the Apple Vision and Tesseract engines, including the first Snapshot after installing; current
 and combined monitors at different Retina scales; region cancellation; three
 overlapping translation cards; outside-click dismissal without a Space switch;
 light/dark blur; and CLI/Ollama switching with cancellation. Use synthetic text.

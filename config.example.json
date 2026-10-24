@@ -30,6 +30,7 @@
   "reduce_transparency": false,
   "reduce_motion": false,
   "ocr_languages": "eng",
+  "ocr_engine": "auto",
   "tessdata_dir": "",
   "cli_runtime": "custom",
   "cli_free_only": true,

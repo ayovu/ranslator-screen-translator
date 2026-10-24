@@ -364,6 +364,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                         "ready" => {
                             app.resolved = provider::resolve_auto(&app.config);
                             app.provider_label();
+                            ocr::warm_up(&app.config);
                             #[cfg(target_os = "linux")]
                             if std::env::var_os("WAYLAND_DISPLAY").is_some() {
                                 let keys = tx.clone();
@@ -534,6 +535,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                                     app.taps = Default::default();
                                     app.config = config;
                                     app.resolved = provider::resolve_auto(&app.config);
+                                    ocr::warm_up(&app.config);
                                     crate::emit(
                                         json!({"type":"config_saved", "config":app.config}),
                                     );

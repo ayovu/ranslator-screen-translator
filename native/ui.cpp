@@ -2501,24 +2501,57 @@ class Window : public GlassWindow {
         connect(captureMode, &QComboBox::currentIndexChanged, dialog, describeCapture);
         describeCapture();
         ocr->addRow(captureHelp);
+        // Apple Vision exists only on macOS. Elsewhere the saved value is kept and Tesseract runs.
+        auto *ocrEngine = new GlassComboBox;
+        ocrEngine->setObjectName("ocrEngine");
+        ocrEngine->setAccessibleName(UiText::tr("Text recognition engine"));
+#ifdef Q_OS_MACOS
+        ocrEngine->addItem(UiText::tr("Apple Vision · built into macOS"), "vision");
+#endif
+        ocrEngine->addItem(UiText::tr("Tesseract · uses language packs"), "tesseract");
+        ocrEngine->setCurrentIndex(std::max(
+            0, ocrEngine->findData(
+                   config["ocr_engine"].toString("auto") == "tesseract" ? "tesseract" : "vision")));
+        ocr->addRow(UiText::tr("Recognition"), ocrEngine);
+        ocr->setRowVisible(ocrEngine, ocrEngine->count() > 1);
         auto *ocrLang = new QLineEdit(config["ocr_languages"].toString());
+        ocrLang->setObjectName("ocrLanguages");
         ocr->addRow(UiText::tr("OCR languages"), ocrLang);
         auto *data = new QLineEdit(config["tessdata_dir"].toString());
+        data->setObjectName("ocrModelDirectory");
         data->setPlaceholderText(UiText::tr("Bundled English model"));
         ocr->addRow(UiText::tr("Custom model directory"), data);
         auto *packs = button(UiText::tr("Language packs…"));
+        packs->setObjectName("ocrLanguagePacks");
         ocr->addRow(packs);
         connect(packs, &QPushButton::clicked, dialog,
                 [=, this] { openPacks(ocrLang, data, dialog); });
-        auto *ocrHelp = label(
-            UiText::tr(
-                "English is included. Language packs downloads extra OCR languages in one step. "
-                "You can also use custom Tesseract files with codes such as eng+rus or eng+jpn. "
-                "Screenshot text recognition stays on your device; only the words you select go "
-                "to the translation provider."),
-            "muted");
+        auto *ocrHelp = label("", "muted");
+        ocrHelp->setObjectName("ocrEngineHelp");
         ocrHelp->setWordWrap(true);
         ocr->addRow(ocrHelp);
+        auto describeEngine = [ocrEngine, ocrLang, data, packs, ocrHelp] {
+            const bool vision = ocrEngine->currentData().toString() == "vision";
+            // Vision needs no model files, so Tesseract's model controls would have no effect.
+            data->setEnabled(!vision);
+            packs->setEnabled(!vision);
+            ocrHelp->setText(
+                vision ? UiText::tr(
+                             "Apple Vision reads most scripts and detects languages on its own; "
+                             "OCR languages tell it which to prefer. The first recognition after "
+                             "installing or updating macOS prepares its models in the background "
+                             "and can take about a minute. Screenshot text recognition stays on "
+                             "your device; only the words you select go to the translation "
+                             "provider.")
+                       : UiText::tr(
+                             "English is included. Language packs downloads extra OCR languages "
+                             "in one step. You can also use custom Tesseract files with codes "
+                             "such as eng+rus or eng+jpn. Screenshot text recognition stays on "
+                             "your device; only the words you select go to the translation "
+                             "provider."));
+        };
+        connect(ocrEngine, &QComboBox::currentIndexChanged, dialog, describeEngine);
+        describeEngine();
         auto *appearance = page(UiText::tr("Appearance"),
                                 UiText::tr("Glass, light, and a little room to breathe."));
         auto *theme = new GlassComboBox;
@@ -2621,6 +2654,9 @@ class Window : public GlassWindow {
             candidate["selection_delay_ms"] = settle->value();
             candidate["watch_clipboard"] = clipboard->isChecked();
             candidate["ocr_languages"] = ocrLang->text().trimmed();
+#ifdef Q_OS_MACOS
+            candidate["ocr_engine"] = ocrEngine->currentData().toString();
+#endif
             candidate["tessdata_dir"] = data->text().trimmed();
             candidate["snapshot_copy_text"] = copySnapshot->isChecked();
             candidate["capture_mode"] = captureMode->currentData().toString();

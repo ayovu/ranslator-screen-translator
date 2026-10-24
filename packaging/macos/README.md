@@ -23,6 +23,13 @@ signature, renders a widget and runs bundled OCR before creating a ZIP. Qt 6.12
 requires macOS 14.4 or newer; the resulting `Info.plist` is raised further if any
 bundled library has a newer minimum OS requirement.
 
+Snapshot uses Apple Vision for OCR, linked from the system frameworks. Tesseract
+and its English model remain in the bundle for the **Tesseract** engine choice in
+Settings → Screen text. Vision compiles its recognizer on each app's first use
+after installation or a macOS update (about a minute), so the app prepares it in
+the background at launch; the first test run on a new machine is slower for the
+same reason.
+
 By default the bundle is ad-hoc signed for local testing. For distribution with a
 Developer ID, set `RANSLATOR_SIGN_IDENTITY`. Set `RANSLATOR_NOTARY_PROFILE` to an
 existing `notarytool` keychain profile to notarize and staple the resulting app.

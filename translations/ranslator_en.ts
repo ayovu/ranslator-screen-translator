@@ -134,13 +134,13 @@
         <location line="+102"/>
         <location line="+714"/>
         <location line="+108"/>
-        <location line="+1517"/>
+        <location line="+1553"/>
         <location line="+20"/>
         <source>TRANSLATION</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-2459"/>
+        <location line="-2495"/>
         <location line="+76"/>
         <source>Read this translation full screen</source>
         <translation type="unfinished"></translation>
@@ -367,13 +367,13 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1539"/>
+        <location line="+1575"/>
         <location line="+12"/>
         <source>Start at login</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1527"/>
+        <location line="-1563"/>
         <source>Translate into %1; use %2 when the source already matches. Choose a language to override.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -384,12 +384,12 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+1385"/>
+        <location line="+1421"/>
         <source>Translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1361"/>
+        <location line="-1397"/>
         <source>Select, paste, or type something to translate.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -583,12 +583,12 @@
     </message>
     <message>
         <location line="+7"/>
-        <location line="+949"/>
+        <location line="+985"/>
         <source>Translation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-949"/>
+        <location line="-985"/>
         <source>Choose the engine that understands you.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -816,13 +816,13 @@
     <message>
         <location line="+1"/>
         <location line="+69"/>
-        <location line="+354"/>
+        <location line="+390"/>
         <location line="+76"/>
         <source>Snapshot</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-491"/>
+        <location line="-527"/>
         <source>Record shortcut: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -934,12 +934,32 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>OCR languages</source>
+        <location line="+12"/>
+        <source>Text recognition engine</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
+        <source>Apple Vision · built into macOS</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Tesseract · uses language packs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Recognition</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>OCR languages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Bundled English model</source>
         <translation type="unfinished"></translation>
     </message>
@@ -954,12 +974,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+15"/>
+        <source>Apple Vision reads most scripts and detects languages on its own; OCR languages tell it which to prefer. The first recognition after installing or updating macOS prepares its models in the background and can take about a minute. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>English is included. Language packs downloads extra OCR languages in one step. You can also use custom Tesseract files with codes such as eng+rus or eng+jpn. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1054,7 +1079,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="+77"/>
         <source>A little closer to understanding.</source>
         <translation type="unfinished"></translation>
     </message>
