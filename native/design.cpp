@@ -336,21 +336,27 @@ static void paintPreviewMaterial(QPainter &p, QRectF body) {
     scene.render(&p, body, sample.rect(), Qt::IgnoreAspectRatio);
 }
 
-// macOS: the system draws the shadow and the glass; Ranslator adds only a legibility tint and
-// the hairline edge Apple windows have.
+// macOS: the system draws the glass; Ranslator adds a legibility tint, the hairline edge Apple
+// windows have, and a shadow shaped like the body.
 static void paintMacWindow(QWidget *widget, QPainter &p) {
     const QRectF body =
         QRectF(widget->rect()).adjusted(windowInset, windowInset, -windowInset, -windowInset);
     const bool preview = widget->property("designPreview").toBool();
-    if (preview) {
-        // Stand-in for the window shadow WindowServer draws around the real window.
-        for (int i = 16; i > 0; --i) {
-            p.setPen(Qt::NoPen);
-            p.setBrush(QColor(0, 0, 0, current.dark ? 4 : 3));
-            p.drawRoundedRect(body.adjusted(-i, -i / 2.0, i, i).translated(0, 6), windowRadius + i,
-                              windowRadius + i);
-        }
+    // A soft shadow that follows the rounded body and stays inside the transparent canvas: its
+    // widest ring reaches 14 px out plus a 4 px drop, under the 20 px inset on every side. It is
+    // clipped to the outside so it never darkens the glass.
+    QPainterPath outside;
+    outside.addRect(QRectF(widget->rect()));
+    outside = outside.subtracted(rounded(body, windowRadius));
+    p.save();
+    p.setClipPath(outside);
+    p.setPen(Qt::NoPen);
+    for (int i = 14; i > 0; --i) {
+        p.setBrush(QColor(0, 0, 0, current.dark ? 6 : 4));
+        p.drawRoundedRect(body.adjusted(-i, -i * .6, i, i).translated(0, 4), windowRadius + i,
+                          windowRadius + i);
     }
+    p.restore();
     const auto path = rounded(body, windowRadius);
     const bool glass =
         !current.reducedTransparency && (widget->property("desktopBlur").toBool() || preview);

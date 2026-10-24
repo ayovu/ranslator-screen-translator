@@ -507,9 +507,9 @@ bool applyBackdrop(QWidget *widget, bool enabled, bool dark, qreal inset, qreal 
     }
     window.opaque = NO;
     window.backgroundColor = NSColor.clearColor;
-    // The system shadow follows the window's alpha, which is only the rounded body.
-    window.hasShadow = YES;
-    [window invalidateShadow];
+    // AppKit sizes its shadow to the whole window, including the transparent canvas around the
+    // rounded body, so it would not match the visible window. Ranslator paints that shadow.
+    window.hasShadow = NO;
     window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
     return enabled && effect != nil;
 }

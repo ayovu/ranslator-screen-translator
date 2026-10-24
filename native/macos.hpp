@@ -24,7 +24,8 @@ namespace NativeMac {
 void capture(QObject *owner, const QString &mode, QScreen *screen,
              std::function<void(QImage, QString)> done);
 // System material behind the window's rounded body: Liquid Glass on macOS 26 and later, a
-// vibrant NSVisualEffectView before that. The window shadow follows the body's shape.
+// vibrant NSVisualEffectView before that. The system shadow is off; design.cpp paints one that
+// matches the body.
 bool applyBackdrop(QWidget *widget, bool enabled, bool dark, qreal inset, qreal radius);
 // The user's accent color, and the Reduce motion / Reduce transparency accessibility settings.
 QColor accentColor(bool dark);
