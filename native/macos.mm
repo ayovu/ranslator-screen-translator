@@ -397,12 +397,10 @@ void capture(QObject *owner, const QString &mode, QScreen *screen,
                                                    [SCStreamConfiguration new];
                                                // CGDisplayPixelsWide counts points; on
                                                // Retina that halves the frame and blurs text.
-                                               configuration.width = static_cast<size_t>(
-                                                   qRound(display.geometry.width() *
-                                                          display.scale));
-                                               configuration.height = static_cast<size_t>(
-                                                   qRound(display.geometry.height() *
-                                                          display.scale));
+                                               configuration.width = static_cast<size_t>(qRound(
+                                                   display.geometry.width() * display.scale));
+                                               configuration.height = static_cast<size_t>(qRound(
+                                                   display.geometry.height() * display.scale));
                                                configuration.showsCursor = NO;
                                                [SCScreenshotManager
                                                    captureImageWithFilter:filter
