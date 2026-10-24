@@ -458,7 +458,7 @@ void capture(QObject *owner, const QString &mode, QScreen *screen,
                                  }];
 }
 
-bool applyBackdrop(QWidget *widget, bool enabled, bool dark) {
+bool applyBackdrop(QWidget *widget, bool enabled, bool dark, qreal inset, qreal radius) {
     if (QGuiApplication::platformName() != "cocoa")
         return false;
     NSView *view = (__bridge NSView *)(reinterpret_cast<void *>(widget->winId()));
@@ -466,15 +466,22 @@ bool applyBackdrop(QWidget *widget, bool enabled, bool dark) {
     if (!window || !view.superview)
         return false;
     static char backdropKey;
-    NSVisualEffectView *effect = objc_getAssociatedObject(window, &backdropKey);
+    NSView *effect = objc_getAssociatedObject(window, &backdropKey);
     if (!effect && enabled) {
         // Qt owns its contentView and responder chain. Insert a sibling behind it;
         // replacing contentView would break Cocoa focus, resizing, and destruction.
-        effect = [[NSVisualEffectView alloc] initWithFrame:view.frame];
+        // Liquid Glass exists from macOS 26. A runtime lookup keeps 14.4 support without
+        // @available, whose check needs a compiler runtime the Rust link does not include.
+        if (Class glass = NSClassFromString(@"NSGlassEffectView")) {
+            effect = [[glass alloc] initWithFrame:view.frame];
+        } else {
+            NSVisualEffectView *vibrant = [[NSVisualEffectView alloc] initWithFrame:view.frame];
+            vibrant.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+            vibrant.material = NSVisualEffectMaterialPopover;
+            vibrant.state = NSVisualEffectStateActive;
+            effect = vibrant;
+        }
         effect.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-        effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
-        effect.material = NSVisualEffectMaterialHUDWindow;
-        effect.state = NSVisualEffectStateActive;
         [view.superview addSubview:effect positioned:NSWindowBelow relativeTo:view];
         objc_setAssociatedObject(window, &backdropKey, effect, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -482,19 +489,91 @@ bool applyBackdrop(QWidget *widget, bool enabled, bool dark) {
         effect.hidden = !enabled;
         effect.appearance =
             [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-        effect.wantsLayer = YES;
-        effect.layer.cornerRadius = 30;
-        effect.layer.masksToBounds = YES;
+        if (Class glass = NSClassFromString(@"NSGlassEffectView");
+            glass && [effect isKindOfClass:glass]) {
+            [effect setValue:@(radius) forKey:@"cornerRadius"];
+        } else {
+            effect.wantsLayer = YES;
+            effect.layer.cornerRadius = radius;
+            effect.layer.cornerCurve = kCACornerCurveContinuous;
+            effect.layer.masksToBounds = YES;
+        }
         if (effect.superview != view.superview) {
             [effect removeFromSuperview];
             [view.superview addSubview:effect positioned:NSWindowBelow relativeTo:view];
         }
-        effect.frame = [view convertRect:NSInsetRect(view.bounds, 20, 20) toView:view.superview];
+        effect.frame = [view convertRect:NSInsetRect(view.bounds, inset, inset)
+                                  toView:view.superview];
     }
     window.opaque = NO;
     window.backgroundColor = NSColor.clearColor;
+    // The system shadow follows the window's alpha, which is only the rounded body.
+    window.hasShadow = YES;
+    [window invalidateShadow];
     window.collectionBehavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
     return enabled && effect != nil;
+}
+
+QColor accentColor(bool dark) {
+    NSAppearance *appearance =
+        [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+    __block QColor result;
+    [appearance performAsCurrentDrawingAppearance:^{
+      NSColor *color =
+          [NSColor.controlAccentColor colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+      if (color)
+          result = QColor::fromRgbF(color.redComponent, color.greenComponent, color.blueComponent);
+    }];
+    return result.isValid() ? result : QColor(dark ? "#0a84ff" : "#007aff");
+}
+bool reduceMotion() { return NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion; }
+bool reduceTransparency() {
+    return NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceTransparency;
+}
+
+QImage symbol(const QString &name, qreal pointSize, const QColor &color, qreal scale) {
+    @autoreleasepool {
+        NSImage *base = [NSImage imageWithSystemSymbolName:name.toNSString()
+                                  accessibilityDescription:nil];
+        if (!base)
+            return {};
+        NSColor *tint = [NSColor colorWithSRGBRed:color.redF()
+                                            green:color.greenF()
+                                             blue:color.blueF()
+                                            alpha:color.alphaF()];
+        NSImageSymbolConfiguration *configuration =
+            [[NSImageSymbolConfiguration configurationWithPointSize:pointSize
+                                                             weight:NSFontWeightRegular
+                                                              scale:NSImageSymbolScaleMedium]
+                configurationByApplyingConfiguration:[NSImageSymbolConfiguration
+                                                         configurationWithPaletteColors:@[ tint ]]];
+        NSImage *image = [base imageWithSymbolConfiguration:configuration];
+        const NSSize size = image.size;
+        const int width = qCeil(size.width * scale), height = qCeil(size.height * scale);
+        if (width <= 0 || height <= 0)
+            return {};
+        QImage result(width, height, QImage::Format_ARGB32_Premultiplied);
+        result.fill(Qt::transparent);
+        CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        CGContextRef context =
+            CGBitmapContextCreate(result.bits(), width, height, 8, result.bytesPerLine(), space,
+                                  kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+        CGColorSpaceRelease(space);
+        if (!context)
+            return {};
+        NSGraphicsContext *graphics = [NSGraphicsContext graphicsContextWithCGContext:context
+                                                                              flipped:NO];
+        [NSGraphicsContext saveGraphicsState];
+        NSGraphicsContext.currentContext = graphics;
+        [image drawInRect:NSMakeRect(0, 0, width, height)
+                 fromRect:NSZeroRect
+                operation:NSCompositingOperationSourceOver
+                 fraction:1];
+        [NSGraphicsContext restoreGraphicsState];
+        CGContextRelease(context);
+        result.setDevicePixelRatio(scale);
+        return result;
+    }
 }
 
 void prepareOverlay(QWidget *widget) {

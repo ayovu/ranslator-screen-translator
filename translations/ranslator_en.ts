@@ -14,12 +14,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../native/shortcut_recorder.hpp" line="+57"/>
+        <location filename="../native/shortcut_recorder.hpp" line="+97"/>
         <source>Listening… Press keys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <location line="+157"/>
         <source>Activate to record a shortcut. Escape cancels recording.</source>
         <translation type="unfinished"></translation>
@@ -90,7 +90,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+35"/>
         <source>Auto · %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -139,13 +139,13 @@
         <location line="+102"/>
         <location line="+714"/>
         <location line="+108"/>
-        <location line="+1618"/>
+        <location line="+1625"/>
         <location line="+20"/>
         <source>TRANSLATION</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-2560"/>
+        <location line="-2567"/>
         <location line="+76"/>
         <source>Read this translation full screen</source>
         <translation type="unfinished"></translation>
@@ -259,18 +259,18 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+875"/>
+        <location line="+881"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-872"/>
-        <location line="+1440"/>
+        <location line="-878"/>
+        <location line="+1446"/>
         <source>Translate selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1439"/>
+        <location line="-1445"/>
         <source>Translate all</source>
         <translation type="unfinished"></translation>
     </message>
@@ -373,13 +373,13 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1638"/>
+        <location line="+1646"/>
         <location line="+12"/>
         <source>Start at login</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1626"/>
+        <location line="-1634"/>
         <source>Translate into %1; use %2 when the source already matches. Choose a language to override.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -390,12 +390,12 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+1484"/>
+        <location line="+1491"/>
         <source>Translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1465"/>
+        <location line="-1466"/>
         <source>Select text, then press %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -564,11 +564,12 @@
     </message>
     <message>
         <location line="+55"/>
+        <location line="+1047"/>
         <source>Languages</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-1046"/>
         <source>One preferred language. A natural way back.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -599,12 +600,12 @@
     </message>
     <message>
         <location line="+7"/>
-        <location line="+1012"/>
+        <location line="+1015"/>
         <source>Translation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1012"/>
+        <location line="-1015"/>
         <source>Choose the engine that understands you.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -832,13 +833,13 @@
     <message>
         <location line="+1"/>
         <location line="+95"/>
-        <location line="+390"/>
-        <location line="+76"/>
+        <location line="+391"/>
+        <location line="+77"/>
         <source>Snapshot</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-553"/>
+        <location line="-555"/>
         <source>Record shortcut: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1145,13 +1146,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>Type or paste text here…
-Ctrl+Enter to translate</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+9"/>
         <source>Text to translate</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1198,12 +1193,12 @@ in another language.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+372"/>
+        <location line="+374"/>
         <source>Auto translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-371"/>
+        <location line="-373"/>
         <source>Keep listening</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1213,28 +1208,34 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>Select text once · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+361"/>
+        <location line="+362"/>
         <source>Translate each new text selection in other apps; click again to stop · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-359"/>
         <source>Select text on screen · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1500"/>
+        <location line="-1502"/>
         <source>Select anywhere with %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1558"/>
+        <location line="+1412"/>
+        <source>Type or paste text here…
+%1 to translate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+148"/>
         <source>Ranslator — ready</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1279,7 +1280,7 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+147"/>
+        <location line="+148"/>
         <source>Select some text first, then try again.</source>
         <translation type="unfinished"></translation>
     </message>

@@ -122,6 +122,12 @@ static QComboBox *languages(bool source) {
         "Choose a language, or type any ISO code / language name supported by your provider."));
     box->setAccessibleName(source ? UiText::tr("Source language")
                                   : UiText::tr("Translation language"));
+    if (auto *edit = box->lineEdit())
+        // A name wider than a compact field shows its beginning, not its scrolled-off end.
+        QObject::connect(edit, &QLineEdit::textChanged, edit, [edit] {
+            if (!edit->hasFocus())
+                edit->setCursorPosition(0);
+        });
     return box;
 }
 static QString languageValue(QComboBox *box) {
@@ -1432,6 +1438,12 @@ class Window : public GlassWindow {
                 sourceText->setFocus(Qt::OtherFocusReason);
         });
     }
+    static QKeySequence translateKeys() {
+        // Command-Return on a Mac (Meta is Command with AA_MacDontSwapCtrlAndMeta); Ctrl+Return
+        // elsewhere.
+        return QKeySequence(Design::macStyle ? (Qt::META | Qt::Key_Return)
+                                             : (Qt::CTRL | Qt::Key_Return));
+    }
     QString readyHint() const {
         return config["translate_selection"].toObject()["sequence"].toString().isEmpty()
                    ? UiText::tr("Select anywhere with %1").arg(bindingDescription("once"))
@@ -1440,7 +1452,7 @@ class Window : public GlassWindow {
     }
     QString bindingDescription(const char *id) const {
         auto b = config[id].toObject();
-        return b["sequence"].toString() +
+        return shortcutLabel(b["sequence"].toString()) +
                (b["taps"].toInt() > 1 ? QString(" ×%1").arg(b["taps"].toInt()) : "");
     }
     void translate() {
@@ -2080,7 +2092,7 @@ class Window : public GlassWindow {
             nav->setProperty("quiet", true);
             nav->setProperty(
                 "glyph",
-                QStringList{"language", "spark", "keyboard", "scan", "appearance", "loop"}.value(
+                QStringList{"language", "spark", "keyboard", "scan", "appearance", "power"}.value(
                     index));
             nav->setMinimumHeight(42);
             nav->setCheckable(true);
@@ -2846,7 +2858,8 @@ class Window : public GlassWindow {
         sourceText = new QPlainTextEdit;
         sourceText->setObjectName("sourceText");
         sourceText->setPlaceholderText(
-            UiText::tr("Type or paste text here…\nCtrl+Enter to translate"));
+            UiText::tr("Type or paste text here…\n%1 to translate")
+                .arg(Design::macStyle ? shortcutLabel("Meta+Return") : QString("Ctrl+Enter")));
         sourceText->setAccessibleName(UiText::tr("Text to translate"));
         sourceText->setMinimumHeight(96);
         sourceText->setMaximumHeight(160);
@@ -2929,6 +2942,7 @@ class Window : public GlassWindow {
             b->setProperty("quiet", true);
             modes->addWidget(b, 1);
         }
+        modeSurface->setSegments({onceButton, continuousButton, snapshot});
         onceButton->setToolTip(UiText::tr("Select text once · %1").arg(bindingDescription("once")));
         continuousButton->setToolTip(
             UiText::tr("Translate each new text selection in other apps; click again to stop · %1")
@@ -2943,7 +2957,7 @@ class Window : public GlassWindow {
         status->setAlignment(Qt::AlignCenter);
         status->setWordWrap(true);
         layout->addWidget(status);
-        auto *shortcut = new QShortcut(QKeySequence("Ctrl+Return"), this);
+        auto *shortcut = new QShortcut(translateKeys(), this);
         connect(shortcut, &QShortcut::activated, this, [this] { translate(); });
         auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
         connect(escape, &QShortcut::activated, this, [this] { hide(); });
@@ -3100,7 +3114,7 @@ class Window : public GlassWindow {
         setLanguage(targetLanguage, "en");
         route->setText("CHINESE  →  ENGLISH");
         providerLabel->setText("●  On-device · Ollama");
-        status->setText("Select anywhere with " + bindingDescription("once"));
+        status->setText(readyHint());
         sourceText->clearFocus();
         config["appearance"] = "light";
         Design::configure(config);
@@ -3124,6 +3138,7 @@ class Window : public GlassWindow {
              {"target", "en"}});
         save(quick, "quick-light");
         quick->hide();
+        Design::glyphSheet().save(directory + "/glyphs.png");
         openSettings();
         QTimer::singleShot(180, this, [this, directory] {
             if (!settings) {
@@ -3137,8 +3152,8 @@ class Window : public GlassWindow {
             provider->setCurrentIndex(provider->findData("ollama"));
             Design::preview(settings).save(directory + "/settings-translation.png");
             Design::preview(settings).save(directory + "/settings-translation.jpg", "JPG", 87);
-            auto *pages = settings->findChild<QStackedWidget *>("settingsPages");
-            pages->setCurrentIndex(0);
+            // Navigate as a person would, so the sidebar selection matches the page.
+            namedPreviewPage(settings, UiText::tr("Languages"));
             config["appearance"] = "dark";
             Design::configure(config);
             Design::preview(settings).save(directory + "/settings-dark.png");

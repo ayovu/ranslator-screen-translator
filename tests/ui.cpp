@@ -330,7 +330,9 @@ class UiTests : public QObject {
         QVERIFY(popup.isVisible());
         auto *text = popup.findChild<QPlainTextEdit *>();
         QCOMPARE(text->toPlainText(), QString("翻訳"));
-        QVERIFY(text->font().families().contains("Noto Sans CJK JP"));
+        // Japanese text uses Japanese Han forms: Hiragino on macOS, the bundled Noto elsewhere.
+        QVERIFY(text->font().families().contains(Design::macStyle ? "Hiragino Sans"
+                                                                  : "Noto Sans CJK JP"));
     }
     void theme_changes_keep_child_backgrounds_transparent() {
         GlassWindow window;
@@ -686,9 +688,24 @@ class UiTests : public QObject {
         QCOMPARE(args[args.indexOf("--delay") + 1], "0");
         dialog->close();
     }
+    void shortcut_labels_use_platform_symbols_and_keep_saved_text_portable() {
+#ifdef Q_OS_MACOS
+        QCOMPARE(shortcutLabel("Alt+Shift+C"), QString("⌥⇧C"));
+        // Apple's modifier order, whatever order the sequence was saved in.
+        QCOMPARE(shortcutLabel("Meta+Shift+Ctrl+Alt+Return"), QString("⌃⌥⇧⌘↩"));
+        QCOMPARE(shortcutLabel("Shift"), QString("⇧"));
+        QCOMPARE(shortcutLabel("Ctrl++"), QString("⌃+"));
+#else
+        QCOMPARE(shortcutLabel("Alt+Shift+C"), QString("Alt+Shift+C"));
+#endif
+        QCOMPARE(shortcutLabel(""), QString());
+        ShortcutRecorder recorder("Alt+Shift+C", {});
+        QCOMPARE(recorder.sequence(), QString("Alt+Shift+C"));
+        QCOMPARE(recorder.text(), shortcutLabel("Alt+Shift+C"));
+    }
     void translate_selection_comes_first_can_be_turned_off_and_needs_its_own_chord() {
         Window window(defaults(), true);
-        QVERIFY(window.findChild<QLabel *>("status")->text().contains("Alt+Shift+C"));
+        QVERIFY(window.findChild<QLabel *>("status")->text().contains(shortcutLabel("Alt+Shift+C")));
         named(&window, "Open settings")->click();
         auto *dialog = window.findChild<QDialog *>();
         named(dialog, "Shortcuts")->click();

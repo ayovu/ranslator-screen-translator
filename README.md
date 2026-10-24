@@ -20,20 +20,30 @@ The first public release is being prepared. Linux packages are produced as **App
 
 Automatic translation uses an available local Ollama model, otherwise the online MyMemory service. Choose Ollama explicitly for local-only translation.
 
-Developed on **Arch Linux / KDE Plasma Wayland**. Other Wayland desktops and X11 use their available integrations; shortcuts, monitor capture and blur can differ. **macOS is experimental and still needs testing on a real Mac.** See the [platform validation notes](docs/PORTABILITY.md).
+Developed on **Arch Linux / KDE Plasma Wayland**. Other Wayland desktops and X11 use their available integrations; shortcuts, monitor capture and blur can differ. **macOS is experimental:** it builds, packages and runs on Apple Silicon with macOS 27, and its desktop checks are still in progress. See the [platform validation notes](docs/PORTABILITY.md).
 
 AUR and Flathub publication is planned; the app is not listed there yet. [Packaging and release details](docs/RELEASING.md).
 
 ## Build
 
-Install the [platform dependencies](docs/USER_GUIDE.md#build-and-verify), then:
+Pick the row for the machine you build on. There are no cross builds: a Mac package is built on a Mac of the same architecture.
+
+| Target | Build on | Command | Result | Runs on |
+| --- | --- | --- | --- | --- |
+| Linux x86_64 | Linux with the [build dependencies](docs/USER_GUIDE.md#build-and-verify) | `scripts/install.sh` (or `scripts/package-appimage.sh`, `scripts/package-flatpak.sh`) | `~/.local` install, AppImage or Flatpak | glibc desktops; Wayland or X11 |
+| macOS Apple Silicon | An Apple Silicon Mac with Xcode | `scripts/package-macos.sh` | `dist/macos-arm64/Ranslator.app` and ZIP | macOS 14.4 or newer\* |
+| macOS Intel | An Intel Mac with Xcode | `scripts/package-macos.sh` | `dist/macos-x86_64/Ranslator.app` and ZIP | macOS 14.4 or newer\* |
+
+\* Qt 6.12's minimum. The script raises it to the newest minimum among the bundled libraries, which is the build machine's macOS when Homebrew compiles them from source. The same source gives each platform its own look: Ranslator's glass on Linux; on macOS the system font, accent color, SF Symbols and Liquid Glass (macOS 26 and later; vibrancy on 14 and 15). Details: [Mac build guide](packaging/macos/README.md).
+
+For development on either platform, install the [platform dependencies](docs/USER_GUIDE.md#build-and-verify), then:
 
 ```sh
 cargo build --release --locked
 cargo run --release --locked -- --window
 ```
 
-On Linux, `scripts/install.sh` installs to `~/.local`. For macOS, follow the [Mac build guide](packaging/macos/README.md).
+On Linux, `scripts/install.sh` installs to `~/.local`.
 
 ## Contribute
 

@@ -16,6 +16,25 @@ brew install rust cmake qt tesseract pkg-config python librsvg
 scripts/package-macos.sh
 ```
 
+Ranslator links only Qt Widgets and Network. If Homebrew cannot pour bottles (a custom prefix
+builds `qt`, including WebEngine, from source for hours), use the official Qt binaries instead and
+point the script at them:
+
+```sh
+uv tool run --from aqtinstall aqt install-qt mac desktop 6.12.0 clang_64 -O ~/Qt
+RANSLATOR_QT_PREFIX=~/Qt/6.12.0/macos scripts/package-macos.sh
+```
+
+| macOS | Window material | Notes |
+| --- | --- | --- |
+| 14.4 – 15 | `NSVisualEffectView` (popover vibrancy) | Same layout and controls |
+| 26 and later | `NSGlassEffectView` (Liquid Glass) | Looked up at run time; one build serves every version |
+
+The interface follows macOS conventions in `native/design.cpp` and `native/macos.mm`: the system
+font, the user's accent color, SF Symbols, ⌃⌥⇧⌘ shortcut labels, ⌘↩ to translate, a sliding
+segmented control and short spring animations. Reduce motion and Reduce transparency in System
+Settings → Accessibility apply in addition to Ranslator's own switches.
+
 The script runs Rust tests, builds a release, assembles
 `dist/macos-<architecture>/Ranslator.app`, copies Qt/Tesseract and their dependent
 libraries, and checks every Mach-O architecture and load path. It verifies the

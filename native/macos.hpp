@@ -23,7 +23,15 @@ namespace NativeMac {
 // Each request is one frame. No background screen recording or persistent capture stream.
 void capture(QObject *owner, const QString &mode, QScreen *screen,
              std::function<void(QImage, QString)> done);
-bool applyBackdrop(QWidget *widget, bool enabled, bool dark);
+// System material behind the window's rounded body: Liquid Glass on macOS 26 and later, a
+// vibrant NSVisualEffectView before that. The window shadow follows the body's shape.
+bool applyBackdrop(QWidget *widget, bool enabled, bool dark, qreal inset, qreal radius);
+// The user's accent color, and the Reduce motion / Reduce transparency accessibility settings.
+QColor accentColor(bool dark);
+bool reduceMotion();
+bool reduceTransparency();
+// An SF Symbol rendered in one color; null when the symbol is unavailable.
+QImage symbol(const QString &name, qreal pointSize, const QColor &color, qreal scale);
 void prepareOverlay(QWidget *widget);
 AutostartState autostartState();
 void setAutostart(QObject *owner, bool enabled, std::function<void(AutostartState, QString)> done);
