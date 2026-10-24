@@ -3,6 +3,9 @@
 #include <QtWidgets>
 #include <functional>
 #include <memory>
+#ifdef __OBJC__
+@class NSPasteboard;
+#endif
 
 class MacShortcuts : public QObject {
   public:
@@ -25,4 +28,17 @@ void prepareOverlay(QWidget *widget);
 AutostartState autostartState();
 void setAutostart(QObject *owner, bool enabled, std::function<void(AutostartState, QString)> done);
 void openLoginItemsSettings();
+// Apple Vision OCR in Tesseract's TSV layout, so the shared OCR parser reads both engines.
+// `languages` holds the configured Tesseract codes; they are recognition hints.
+QString recognizeText(const QString &imagePath, const QString &languages, QString *error);
+// Vision compiles its recognizer on first use per app and macOS build; this pays that cost early.
+bool warmUpTextRecognition(const QString &languages);
+// Translate selection: the focused element's AX selection, else ⌘C in the frontmost app with the
+// pasteboard restored afterwards. `done` runs on the UI thread with the text or an error; both are
+// empty when nothing is selected.
+void readSelection(QObject *owner, std::function<void(QString text, QString error)> done);
+#ifdef __OBJC__
+// Snapshot of every pasteboard item and representation; the returned function restores it.
+std::function<void()> preservePasteboard(NSPasteboard *board);
+#endif
 } // namespace NativeMac

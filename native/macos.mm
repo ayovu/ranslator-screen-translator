@@ -1,4 +1,5 @@
 #include "macos.hpp"
+#include "actions.hpp"
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
@@ -99,7 +100,7 @@ std::optional<Display> displayFor(QScreen *screen) {
         QRect rect(qRound(frame.origin.x), qRound(originHeight - NSMaxY(frame)),
                    qRound(frame.size.width), qRound(frame.size.height));
         if (rect == screen->geometry())
-            return Display{[native.deviceDescription[@"NSScreenNumber"] unsignedIntValue()],
+            return Display{[native.deviceDescription[@"NSScreenNumber"] unsignedIntValue],
                            rect,
                            native.backingScaleFactor};
     }
@@ -243,8 +244,10 @@ void MacShortcuts::bind(const QJsonObject &config, std::function<void(QString)> 
         return;
     }
     UInt32 identifier = 0;
-    for (const auto &id : {"once", "continuous", "snapshot"}) {
+    for (const auto &id : shortcutActions) {
         const auto sequence = config[id].toObject()["sequence"].toString();
+        if (sequence.trimmed().isEmpty())
+            continue;
         if (const auto flags = modifierChord(sequence)) {
             impl->modifiers.insert(*flags, id);
             continue;
@@ -395,10 +398,12 @@ void capture(QObject *owner, const QString &mode, QScreen *screen,
                                                                            excludingWindows:@[]];
                                                SCStreamConfiguration *configuration =
                                                    [SCStreamConfiguration new];
-                                               configuration.width =
-                                                   CGDisplayPixelsWide(display.id);
-                                               configuration.height =
-                                                   CGDisplayPixelsHigh(display.id);
+                                               // CGDisplayPixelsWide counts points; on
+                                               // Retina that halves the frame and blurs text.
+                                               configuration.width = static_cast<size_t>(qRound(
+                                                   display.geometry.width() * display.scale));
+                                               configuration.height = static_cast<size_t>(qRound(
+                                                   display.geometry.height() * display.scale));
                                                configuration.showsCursor = NO;
                                                [SCScreenshotManager
                                                    captureImageWithFilter:filter

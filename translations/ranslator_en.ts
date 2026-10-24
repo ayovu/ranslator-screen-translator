@@ -45,7 +45,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+34"/>
+        <location line="+21"/>
+        <source>Not set</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Listening for a shortcut. Press keys, then release. Escape cancels.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -60,7 +65,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../native/ui.cpp" line="+77"/>
+        <location filename="../native/ui.cpp" line="+78"/>
         <source>Detect language</source>
         <translation type="unfinished"></translation>
     </message>
@@ -134,13 +139,13 @@
         <location line="+102"/>
         <location line="+714"/>
         <location line="+108"/>
-        <location line="+1517"/>
+        <location line="+1618"/>
         <location line="+20"/>
         <source>TRANSLATION</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-2459"/>
+        <location line="-2560"/>
         <location line="+76"/>
         <source>Read this translation full screen</source>
         <translation type="unfinished"></translation>
@@ -254,17 +259,18 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+837"/>
+        <location line="+875"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-834"/>
+        <location line="-872"/>
+        <location line="+1440"/>
         <source>Translate selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-1439"/>
         <source>Translate all</source>
         <translation type="unfinished"></translation>
     </message>
@@ -336,17 +342,17 @@
     </message>
     <message>
         <location line="+31"/>
-        <location line="+140"/>
+        <location line="+142"/>
         <source>Auto · %1 / %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-112"/>
+        <location line="-114"/>
         <source>TRANSLATING</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+81"/>
         <source>Waiting for the system… Approve its permission dialog if shown.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -367,13 +373,13 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1539"/>
+        <location line="+1638"/>
         <location line="+12"/>
         <source>Start at login</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1527"/>
+        <location line="-1626"/>
         <source>Translate into %1; use %2 when the source already matches. Choose a language to override.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -384,12 +390,17 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+1385"/>
+        <location line="+1484"/>
         <source>Translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1361"/>
+        <location line="-1465"/>
+        <source>Select text, then press %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
         <source>Select, paste, or type something to translate.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -414,8 +425,13 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+85"/>
-        <location line="+29"/>
+        <location line="+26"/>
+        <source>This desktop does not share the current selection. Use Select once or Snapshot instead.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+86"/>
+        <location line="+30"/>
         <location line="+21"/>
         <source>Could not save the captured image.</source>
         <translation type="unfinished"></translation>
@@ -426,7 +442,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+31"/>
         <source>Use one key chord, for example Ctrl+Alt+R, or Shift.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -583,12 +599,12 @@
     </message>
     <message>
         <location line="+7"/>
-        <location line="+949"/>
+        <location line="+1012"/>
         <source>Translation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-949"/>
+        <location line="-1012"/>
         <source>Choose the engine that understands you.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -804,7 +820,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+6"/>
         <source>Select once</source>
         <translation type="unfinished"></translation>
     </message>
@@ -815,14 +831,14 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+69"/>
-        <location line="+354"/>
+        <location line="+95"/>
+        <location line="+390"/>
         <location line="+76"/>
         <source>Snapshot</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-491"/>
+        <location line="-553"/>
         <source>Record shortcut: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -848,7 +864,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+5"/>
+        <source>Turn off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Turn off shortcut: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
         <location line="+5"/>
         <source> ms</source>
         <translation type="unfinished"></translation>
@@ -870,11 +896,21 @@
     </message>
     <message>
         <location line="+4"/>
+        <source>Choose how selected text gets translated. Translate selection: select text first, then press the shortcut. Select once: press the shortcut, then select. Toggle continuous: every new selection is translated until you press it again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Click a shortcut to record it, then press and release the keys. Esc cancels; click outside to keep the previous shortcut. Save applies your changes. Choose 1–3 presses separately. Examples: Ctrl+Alt+R, Shift ×2, Ctrl+Shift ×2. Modifier-only chords need support from your desktop and count on release. A selection triggers after it stays unchanged for the delay above. The same shortcut toggles each listener off.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+12"/>
+        <source>Translate selection reads the selection through Accessibility. In apps that do not share it, Ranslator copies it with ⌘C and then restores your clipboard. Password fields are never read.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>Screen text</source>
         <translation type="unfinished"></translation>
     </message>
@@ -934,12 +970,32 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>OCR languages</source>
+        <location line="+12"/>
+        <source>Text recognition engine</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
+        <source>Apple Vision · built into macOS</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Tesseract · uses language packs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Recognition</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>OCR languages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Bundled English model</source>
         <translation type="unfinished"></translation>
     </message>
@@ -954,12 +1010,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+15"/>
+        <source>Apple Vision reads most scripts and detects languages on its own; OCR languages tell it which to prefer. The first recognition after installing or updating macOS prepares its models in the background and can take about a minute. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>English is included. Language packs downloads extra OCR languages in one step. You can also use custom Tesseract files with codes such as eng+rus or eng+jpn. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1054,7 +1115,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="+77"/>
         <source>A little closer to understanding.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1137,12 +1198,12 @@ in another language.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+363"/>
+        <location line="+372"/>
         <source>Auto translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-362"/>
+        <location line="-371"/>
         <source>Keep listening</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1158,22 +1219,22 @@ in another language.</source>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+352"/>
+        <location line="+361"/>
         <source>Translate each new text selection in other apps; click again to stop · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-349"/>
+        <location line="-358"/>
         <source>Select text on screen · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-1500"/>
         <source>Select anywhere with %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+52"/>
+        <location line="+1558"/>
         <source>Ranslator — ready</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1218,7 +1279,17 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+190"/>
+        <location line="+147"/>
+        <source>Select some text first, then try again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Select some text first, then press %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+51"/>
         <source>Ready · Change the target language to translate again.</source>
         <translation type="unfinished"></translation>
     </message>
