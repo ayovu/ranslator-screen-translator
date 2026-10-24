@@ -110,9 +110,11 @@ export default class RanslatorIntegration extends Extension {
             const config = JSON.parse(raw);
             this._releaseBindings();
             const errors = [];
-            for (const id of ['once', 'continuous', 'snapshot']) {
+            for (const id of ['translate_selection', 'once', 'continuous', 'snapshot']) {
                 try {
                     const sequence = config[id]?.sequence;
+                    // Translate selection is optional, and older apps do not send it.
+                    if (id === 'translate_selection' && !sequence) continue;
                     if (typeof sequence !== 'string') throw new Error('Missing shortcut.');
                     const parsed = parseSequence(sequence);
                     if (parsed.mask) {

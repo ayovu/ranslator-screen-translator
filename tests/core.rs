@@ -128,6 +128,64 @@ fn ocr_keeps_geometry_and_reading_order_but_discards_noise() {
     assert_eq!(words[0].line, words[1].line);
 }
 #[test]
+fn ocr_engine_defaults_to_the_native_engine_and_keeps_older_settings_valid() {
+    let native = if cfg!(all(target_os = "macos", not(core_only))) {
+        "vision"
+    } else {
+        "tesseract"
+    };
+    let mut config = Config::default();
+    assert_eq!(config.ocr_engine, "auto");
+    assert_eq!(ocr::engine(&config), native);
+    // Settings written before the engine option existed load with the platform default.
+    let older: Config = serde_json::from_str(r#"{"ocr_languages":"eng+rus"}"#).unwrap();
+    older.validate().unwrap();
+    assert_eq!(ocr::engine(&older), native);
+    // A configuration copied from a Mac still runs Tesseract where Vision is unavailable.
+    config.ocr_engine = "vision".into();
+    config.validate().unwrap();
+    assert_eq!(ocr::engine(&config), native);
+    config.ocr_engine = "tesseract".into();
+    assert_eq!(ocr::engine(&config), "tesseract");
+    config.ocr_engine = "cloud".into();
+    assert!(config.validate().is_err());
+}
+#[cfg(all(target_os = "macos", not(core_only)))]
+#[test]
+fn vision_reads_a_rendered_widget_through_the_shared_ocr_path() {
+    let directory = tempfile::tempdir().unwrap();
+    let image = directory.path().join("widget.png");
+    let isolated = |command: &mut std::process::Command| {
+        command
+            .env("RANSLATOR_CONFIG", directory.path().join("config.json"))
+            .env("XDG_DATA_HOME", directory.path().join("data"));
+    };
+    let mut render = std::process::Command::new(env!("CARGO_BIN_EXE_ranslator"));
+    isolated(&mut render);
+    let rendered = render
+        .env("QT_QPA_PLATFORM", "offscreen")
+        .arg("--smoke-test")
+        .arg(&image)
+        .output()
+        .unwrap();
+    assert!(rendered.status.success(), "{rendered:?}");
+    let mut recognize = std::process::Command::new(env!("CARGO_BIN_EXE_ranslator"));
+    isolated(&mut recognize);
+    let output = recognize.arg("--ocr").arg(&image).output().unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let words: Vec<ocr::Word> = serde_json::from_slice(&output.stdout).unwrap();
+    let position = |text: &str| words.iter().position(|word| word.text == text);
+    let (title, button) = (position("Ranslator"), position("Translate"));
+    assert!(title.is_some() && button.is_some(), "{words:?}");
+    // The title is read before the button below it, and every box lies inside the image.
+    assert!(title < button);
+    assert!(
+        words
+            .iter()
+            .all(|word| word.x >= 0 && word.y >= 0 && word.width > 0)
+    );
+}
+#[test]
 fn config_rejects_invalid_limits_duplicate_bindings_and_language_pairs() {
     let mut config = Config::default();
     config.validate().unwrap();
@@ -141,6 +199,36 @@ fn config_rejects_invalid_limits_duplicate_bindings_and_language_pairs() {
     assert!(config.validate().is_err());
     config.once = Binding::default();
     config.timeout_seconds = 0;
+    assert!(config.validate().is_err());
+}
+#[test]
+fn translate_selection_shortcut_is_adopted_without_breaking_older_settings() {
+    let config = Config::default();
+    assert_eq!(config.translate_selection.sequence, "Alt+Shift+C");
+    assert!(
+        config
+            .bindings()
+            .iter()
+            .any(|(id, _)| *id == "translate_selection")
+    );
+    // Settings saved before the action existed gain its default chord.
+    let mut older: Config =
+        serde_json::from_str(r#"{"once":{"sequence":"Ctrl+Alt+R","taps":1}}"#).unwrap();
+    older.adopt_new_bindings();
+    assert_eq!(older.translate_selection.sequence, "Alt+Shift+C");
+    older.validate().unwrap();
+    // When another action already owns that chord, the new shortcut starts disabled.
+    let mut taken: Config =
+        serde_json::from_str(r#"{"snapshot":{"sequence":"alt+shift+c","taps":1}}"#).unwrap();
+    taken.adopt_new_bindings();
+    assert!(taken.translate_selection.sequence.is_empty());
+    taken.validate().unwrap();
+    assert_eq!(taken.snapshot.sequence, "alt+shift+c");
+    // Disabled is valid, but a chord shared with another action is still rejected.
+    let mut config = Config::default();
+    config.translate_selection.sequence.clear();
+    config.validate().unwrap();
+    config.translate_selection.sequence = config.once.sequence.clone();
     assert!(config.validate().is_err());
 }
 #[test]
