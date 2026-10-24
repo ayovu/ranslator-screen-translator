@@ -12,9 +12,12 @@ fixes in the existing adapters; attach measurements for optimization claims.
 Install Xcode and its command line tools, then:
 
 ```sh
-brew install rust cmake qt tesseract pkg-config python librsvg
+brew install rust cmake qt tesseract pkg-config python
 scripts/package-macos.sh
 ```
+
+The app icon is rasterized with `rsvg-convert` when `librsvg` is installed, otherwise with the
+system's `sips`; either way the bundle gets `Ranslator.icns`.
 
 Ranslator links only Qt Widgets and Network. If Homebrew cannot pour bottles (a custom prefix
 builds `qt`, including WebEngine, from source for hours), use the official Qt binaries instead and

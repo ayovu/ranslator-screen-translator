@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ "$(uname -s)" == Darwin ]] || { printf 'Build this package on macOS with Xcode and Homebrew installed.\n' >&2; exit 1; }
 for program in cargo cmake python3 brew codesign xcrun; do
-    command -v "$program" >/dev/null || { printf 'Missing %s. Install Xcode tools, then: brew install rust cmake qt tesseract pkg-config python librsvg\n' "$program" >&2; exit 1; }
+    command -v "$program" >/dev/null || { printf 'Missing %s. Install Xcode tools, then: brew install rust cmake qt tesseract pkg-config python\n' "$program" >&2; exit 1; }
 done
 arch="$(uname -m)"
 [[ "$arch" == arm64 || "$arch" == x86_64 ]] || { printf 'Unsupported architecture: %s\n' "$arch" >&2; exit 1; }
@@ -32,17 +32,28 @@ info['CFBundleShortVersionString'] = tomllib.loads(pathlib.Path('Cargo.toml').re
 info['LSMinimumSystemVersion'] = os.environ['MACOSX_DEPLOYMENT_TARGET']
 path.write_bytes(plistlib.dumps(info))
 PY
-if command -v rsvg-convert >/dev/null; then
-    iconset="$PWD/build/macos-$arch/Ranslator.iconset"
-    mkdir -p "$iconset"
-    for size in 16 32 128 256 512; do
-        rsvg-convert -w "$size" -h "$size" assets/io.github.ranslator.Ranslator.svg -o "$iconset/icon_${size}x${size}.png"
-        double="$((size * 2))"
-        rsvg-convert -w "$double" -h "$double" assets/io.github.ranslator.Ranslator.svg -o "$iconset/icon_${size}x${size}@2x.png"
-    done
-    iconutil -c icns "$iconset" -o "$app/Contents/Resources/Ranslator.icns"
-    /usr/libexec/PlistBuddy -c 'Add CFBundleIconFile string Ranslator.icns' "$app/Contents/Info.plist"
-fi
+# rsvg-convert is optional. Without it, macOS's own sips rasterizes the SVG; it renders at the
+# document's declared size, so each size gets a copy that declares it.
+render_icon() {
+    if command -v rsvg-convert >/dev/null; then
+        rsvg-convert -w "$1" -h "$1" assets/io.github.ranslator.Ranslator.svg -o "$2"
+    else
+        local source="$PWD/build/macos-$arch/icon-$1.svg"
+        sed "s/width=\"512\" height=\"512\"/width=\"$1\" height=\"$1\"/" \
+            assets/io.github.ranslator.Ranslator.svg > "$source"
+        sips -s format png "$source" --out "$2" >/dev/null
+        rm -f -- "$source"
+    fi
+}
+iconset="$PWD/build/macos-$arch/Ranslator.iconset"
+rm -rf -- "$iconset"
+mkdir -p "$iconset"
+for size in 16 32 128 256 512; do
+    render_icon "$size" "$iconset/icon_${size}x${size}.png"
+    render_icon "$((size * 2))" "$iconset/icon_${size}x${size}@2x.png"
+done
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/Ranslator.icns"
+/usr/libexec/PlistBuddy -c 'Add CFBundleIconFile string Ranslator.icns' "$app/Contents/Info.plist"
 "$qt/bin/macdeployqt" "$app" "-executable=$app/Contents/Helpers/tesseract" -no-codesign
 # macdeployqt deploys only the cocoa platform; the headless smoke test below needs offscreen.
 cp "$qt/plugins/platforms/libqoffscreen.dylib" "$app/Contents/PlugIns/platforms/"
