@@ -631,7 +631,10 @@ class UiTests : public QObject {
         dialog->close();
     }
     void packs_can_download_the_entire_catalog() {
-        Window window(defaults(), true);
+        // Language packs belong to Tesseract; macOS defaults to Apple Vision, which needs none.
+        auto config = defaults();
+        config["ocr_engine"] = "tesseract";
+        Window window(config, true);
         named(&window, "Open settings")->click();
         auto *settings = window.findChild<QDialog *>();
         named(settings, "Screen text")->click();
@@ -662,7 +665,13 @@ class UiTests : public QObject {
         named(dialog, "Screen text")->click();
         auto *mode = dialog->findChild<QComboBox *>("captureMode");
         QVERIFY(mode);
+#ifdef Q_OS_MACOS
+        // macOS has no desktop screenshot service to delegate the picker mode to.
+        QCOMPARE(mode->findData("picker"), -1);
+        for (const auto &value : {"auto", "desktop", "region"}) {
+#else
         for (const auto &value : {"auto", "desktop", "region", "picker"}) {
+#endif
             mode->setCurrentIndex(mode->findData(value));
             named(dialog, "Save")->click();
             QCOMPARE(sent["config"].toObject()["capture_mode"].toString(), value);
@@ -677,6 +686,107 @@ class UiTests : public QObject {
         QCOMPARE(args[args.indexOf("--delay") + 1], "0");
         dialog->close();
     }
+    void ocr_engine_setting_saves_and_disables_model_controls_vision_does_not_use() {
+        auto config = defaults();
+        config["ocr_engine"] = "auto";
+        Window window(config, true);
+        named(&window, "Open settings")->click();
+        auto *dialog = window.findChild<QDialog *>();
+        named(dialog, "Screen text")->click();
+        auto *engine = dialog->findChild<QComboBox *>("ocrEngine");
+        auto *packs = dialog->findChild<QPushButton *>("ocrLanguagePacks");
+        auto *models = dialog->findChild<QLineEdit *>("ocrModelDirectory");
+        QVERIFY(engine && packs && models);
+#ifdef Q_OS_MACOS
+        QCOMPARE(engine->currentData().toString(), "vision");
+        QVERIFY(engine->isVisible());
+        QVERIFY(!packs->isEnabled() && !models->isEnabled());
+        engine->setCurrentIndex(engine->findData("tesseract"));
+        QVERIFY(packs->isEnabled() && models->isEnabled());
+        named(dialog, "Save")->click();
+        QCOMPARE(sent["config"].toObject()["ocr_engine"].toString(), "tesseract");
+        engine->setCurrentIndex(engine->findData("vision"));
+        named(dialog, "Save")->click();
+        QCOMPARE(sent["config"].toObject()["ocr_engine"].toString(), "vision");
+#else
+        // Tesseract is the only engine here; a value copied from a Mac is preserved, not shown.
+        QVERIFY(!engine->isVisible());
+        QVERIFY(packs->isEnabled() && models->isEnabled());
+        named(dialog, "Save")->click();
+        QCOMPARE(sent["config"].toObject()["ocr_engine"].toString(), "auto");
+#endif
+        dialog->close();
+    }
+#ifdef Q_OS_MACOS
+    void vision_reads_small_mixed_script_screen_text_in_reading_order() {
+        // A synthetic Retina screen: light and dark rows, Cyrillic and Latin, 9–14 pt at 2x.
+        struct Row {
+            QString text;
+            int points;
+            QColor color, background;
+        };
+        const QList<Row> rows{
+            {"File Edit View History Bookmarks Window Help", 13, Qt::black, Qt::white},
+            {"Settings and privacy controls for your account", 11, QColor(70, 70, 70), Qt::white},
+            {"Настройки конфиденциальности и безопасности", 12, Qt::black, Qt::white},
+            {"Последнее обновление было вчера в 18:42", 10, QColor(120, 120, 120), Qt::white},
+            {"Нажмите кнопку, чтобы продолжить установку", 13, Qt::white, QColor(40, 40, 46)},
+            {"Small caption text under a thumbnail image", 9, QColor(120, 120, 120), Qt::white},
+        };
+        QImage image(1800, 760, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        QList<QRect> expected;
+        {
+            QPainter painter(&image);
+            int top = 40;
+            for (const auto &row : rows) {
+                QFont font;
+                font.setPixelSize(row.points * 2);
+                painter.setFont(font);
+                const QFontMetrics metrics(font);
+                const QRect box(60, top, metrics.horizontalAdvance(row.text), metrics.height());
+                painter.fillRect(box.adjusted(-20, -12, 20, 12), row.background);
+                painter.setPen(row.color);
+                painter.drawText(box, Qt::AlignLeft | Qt::AlignVCenter, row.text);
+                expected << box;
+                top += metrics.height() + 72;
+            }
+        }
+        QTemporaryDir directory;
+        const auto path = directory.filePath("screen.png");
+        QVERIFY(image.save(path));
+        QString error;
+        const auto tsv = NativeMac::recognizeText(path, "eng+rus", &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QStringList lines;
+        QString current;
+        int row = -1;
+        for (const auto &record : tsv.split('\n', Qt::SkipEmptyParts).mid(1)) {
+            const auto fields = record.split('\t');
+            QCOMPARE(fields.size(), 12);
+            const QRect box(fields[6].toInt(), fields[7].toInt(), fields[8].toInt(),
+                            fields[9].toInt());
+            // Each word lies on the row it was drawn on, and rows are read top to bottom.
+            int match = -1;
+            for (int i = 0; i < expected.size(); ++i)
+                if (expected[i].adjusted(-8, -8, 8, 8).intersects(box))
+                    match = i;
+            QVERIFY2(match >= row, qPrintable(record));
+            if (match != row) {
+                if (row >= 0)
+                    lines << current;
+                current.clear();
+                row = match;
+            }
+            current += (current.isEmpty() ? "" : " ") + fields[11];
+        }
+        lines << current;
+        QStringList drawn;
+        for (const auto &item : rows)
+            drawn << item.text;
+        QCOMPARE(lines, drawn);
+    }
+#endif
     void image_output_metadata_is_used_only_for_single_monitor_capture() {
         auto *first = QGuiApplication::screens().first();
         auto *last = QGuiApplication::screens().last();

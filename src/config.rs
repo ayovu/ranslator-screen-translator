@@ -69,6 +69,8 @@ pub struct Config {
     pub selection_delay_ms: u64,
     pub watch_clipboard: bool,
     pub ocr_languages: String,
+    /// `auto` uses Apple Vision on macOS and Tesseract elsewhere.
+    pub ocr_engine: String,
     pub tessdata_dir: String,
     pub capture_mode: String,
     pub appearance: String,
@@ -106,6 +108,7 @@ impl Default for Config {
             selection_delay_ms: 500,
             watch_clipboard: false,
             ocr_languages: "eng".into(),
+            ocr_engine: "auto".into(),
             tessdata_dir: String::new(),
             capture_mode: "auto".into(),
             appearance: "system".into(),
@@ -152,6 +155,9 @@ impl Config {
         }
         if !["auto", "desktop", "region", "picker"].contains(&self.capture_mode.as_str()) {
             bail!("Choose a supported screenshot mode.");
+        }
+        if !["auto", "vision", "tesseract"].contains(&self.ocr_engine.as_str()) {
+            bail!("Choose Apple Vision or Tesseract for screen text recognition.");
         }
         for lang in [&self.preferred_language, &self.fallback_language] {
             if lang.trim().is_empty() || lang.len() > 64 {

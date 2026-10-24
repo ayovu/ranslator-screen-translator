@@ -17,8 +17,12 @@ use std::{
 
 pub enum Event {
     Ui(Value),
+    // Sent by the Wayland selection and modifier watchers; other platforms only match them.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Selection(u64, Result<String, String>),
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Modifier(String),
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     Capability(String),
     Completed(u64, Value),
     OcrCompleted(u64, Value),
@@ -360,6 +364,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                         "ready" => {
                             app.resolved = provider::resolve_auto(&app.config);
                             app.provider_label();
+                            ocr::warm_up(&app.config);
                             #[cfg(target_os = "linux")]
                             if std::env::var_os("WAYLAND_DISPLAY").is_some() {
                                 let keys = tx.clone();
@@ -530,6 +535,7 @@ pub fn run(config: Config, tx: Sender<Event>, rx: Receiver<Event>) {
                                     app.taps = Default::default();
                                     app.config = config;
                                     app.resolved = provider::resolve_auto(&app.config);
+                                    ocr::warm_up(&app.config);
                                     crate::emit(
                                         json!({"type":"config_saved", "config":app.config}),
                                     );

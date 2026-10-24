@@ -44,6 +44,8 @@ if command -v rsvg-convert >/dev/null; then
     /usr/libexec/PlistBuddy -c 'Add CFBundleIconFile string Ranslator.icns' "$app/Contents/Info.plist"
 fi
 "$qt/bin/macdeployqt" "$app" "-executable=$app/Contents/Helpers/tesseract" -no-codesign
+# macdeployqt deploys only the cocoa platform; the headless smoke test below needs offscreen.
+cp "$qt/plugins/platforms/libqoffscreen.dylib" "$app/Contents/PlugIns/platforms/"
 python3 scripts/bundle-macos-libraries.py "$app" --architecture "$arch"
 mkdir -p "$app/Contents/Resources/licenses"
 RANSLATOR_LICENSE_DIR="$app/Contents/Resources/licenses" python3 scripts/collect-licenses.py

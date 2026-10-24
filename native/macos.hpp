@@ -25,4 +25,9 @@ void prepareOverlay(QWidget *widget);
 AutostartState autostartState();
 void setAutostart(QObject *owner, bool enabled, std::function<void(AutostartState, QString)> done);
 void openLoginItemsSettings();
+// Apple Vision OCR in Tesseract's TSV layout, so the shared OCR parser reads both engines.
+// `languages` holds the configured Tesseract codes; they are recognition hints.
+QString recognizeText(const QString &imagePath, const QString &languages, QString *error);
+// Vision compiles its recognizer on first use per app and macOS build; this pays that cost early.
+bool warmUpTextRecognition(const QString &languages);
 } // namespace NativeMac
