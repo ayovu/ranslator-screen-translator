@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/io.github.ranslator.Ranslator.svg" width="128" height="128" alt="Ranslator icon"></p>
+
 # Ranslator
 
 Translate selected text or words on your screen, then keep reading where you were.
