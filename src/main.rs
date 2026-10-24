@@ -69,7 +69,7 @@ fn run() -> Result<()> {
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Ranslator — native selection translation\n\n  ranslator                     Start in tray (popup mode)\n  ranslator --settings          Open settings\n  ranslator --window            Open full translator\n  ranslator --background        Start in tray\n  ranslator --select            Arm one selection (desktop keybinding command)\n  ranslator --listen            Toggle continuous selection\n  ranslator --snapshot          Capture screen (desktop keybinding command)\n  ranslator --translate [LANG]   Translate UTF-8 stdin\n  ranslator --image IMAGE        Open image in the OCR selection view\n  ranslator --quit               Quit the running app\n  ranslator --ocr IMAGE          Print OCR words as JSON\n  ranslator --doctor             Report dependencies and local models\n  ranslator --smoke-test PATH    Render widget to PNG, then exit\n  ranslator --design-preview DIR Render light/dark UI previews\n\nSettings: {}",
+            "Ranslator — native selection translation\n\n  ranslator                     Start in tray (popup mode)\n  ranslator --settings          Open settings\n  ranslator --window            Open full translator\n  ranslator --background        Start in tray\n  ranslator --translate-selection Translate the current selection (desktop keybinding command)\n  ranslator --select            Arm one selection (desktop keybinding command)\n  ranslator --listen            Toggle continuous selection\n  ranslator --snapshot          Capture screen (desktop keybinding command)\n  ranslator --translate [LANG]   Translate UTF-8 stdin\n  ranslator --image IMAGE        Open image in the OCR selection view\n  ranslator --quit               Quit the running app\n  ranslator --ocr IMAGE          Print OCR words as JSON\n  ranslator --doctor             Report dependencies and local models\n  ranslator --smoke-test PATH    Render widget to PNG, then exit\n  ranslator --design-preview DIR Render light/dark UI previews\n\nSettings: {}",
             Config::path().display()
         );
         return Ok(());
@@ -110,8 +110,17 @@ fn run() -> Result<()> {
             return Ok(());
         }
         Some(
-            "--settings" | "--window" | "--background" | "--smoke-test" | "--design-preview"
-            | "--image" | "--quit" | "--select" | "--listen" | "--snapshot",
+            "--settings"
+            | "--window"
+            | "--background"
+            | "--smoke-test"
+            | "--design-preview"
+            | "--image"
+            | "--quit"
+            | "--translate-selection"
+            | "--select"
+            | "--listen"
+            | "--snapshot",
         )
         | None => (),
         Some(other) => anyhow::bail!("Unknown option: {other}. Use --help."),
@@ -141,6 +150,7 @@ fn run() -> Result<()> {
         startup["_quit"] = json!(true);
     }
     match args.first().map(String::as_str) {
+        Some("--translate-selection") => startup["_action"] = json!("translate_selection"),
         Some("--select") => startup["_action"] = json!("once"),
         Some("--listen") => startup["_action"] = json!("continuous"),
         Some("--snapshot") => startup["_action"] = json!("snapshot"),

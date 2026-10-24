@@ -1,8 +1,10 @@
 #include "accessibility.hpp"
+#include "macos.hpp"
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QPointer>
 #include <QThread>
 #include <QTimer>
@@ -54,59 +56,63 @@ bool secureElement(AXUIElementRef element) {
 }
 } // namespace
 
-// AX attribute queries can block when another app is unresponsive. Keep them off
-// the UI thread, bound their messaging timeout, and allow only one read at a time.
-class MacSelectionReader : public QObject {
-    Q_OBJECT
-  public:
-    void read(pid_t pid, quint64 epoch) {
-        if (!AXIsProcessTrusted()) {
-            emit ready(epoch, {}, 4);
-            return;
-        }
-        if (IsSecureEventInputEnabled()) {
-            emit ready(epoch, {}, 2);
-            return;
-        }
-        auto app = AXUIElementCreateApplication(pid);
-        if (!app) {
-            emit ready(epoch, {}, 3);
-            return;
-        }
-        AXUIElementSetMessagingTimeout(app, 0.15f);
-        QString text;
-        int status = 1;
-        {
-            Attribute focus(app, kAXFocusedUIElementAttribute);
-            if (focus.is(AXUIElementGetTypeID())) {
-                auto element = static_cast<AXUIElementRef>(const_cast<void *>(focus.get()));
-                AXUIElementSetMessagingTimeout(element, 0.15f);
-                if (secureElement(element)) {
-                    status = 2;
+// Selected text of the focused element in `pid`. Status: 0 read (possibly empty), 1 no
+// accessible selection, 2 secure input, 3 application unavailable, 4 permission missing.
+// AX queries can block on an unresponsive app, so callers keep this off the UI thread.
+static int focusedSelection(pid_t pid, QString *result) {
+    if (!AXIsProcessTrusted())
+        return 4;
+    if (IsSecureEventInputEnabled())
+        return 2;
+    auto app = AXUIElementCreateApplication(pid);
+    if (!app)
+        return 3;
+    AXUIElementSetMessagingTimeout(app, 0.15f);
+    QString text;
+    int status = 1;
+    {
+        Attribute focus(app, kAXFocusedUIElementAttribute);
+        if (focus.is(AXUIElementGetTypeID())) {
+            auto element = static_cast<AXUIElementRef>(const_cast<void *>(focus.get()));
+            AXUIElementSetMessagingTimeout(element, 0.15f);
+            if (secureElement(element)) {
+                status = 2;
+            } else {
+                Attribute selectedRange(element, kAXSelectedTextRangeAttribute);
+                CFRange range{};
+                const bool hasRange =
+                    selectedRange.is(AXValueGetTypeID()) &&
+                    AXValueGetType(static_cast<AXValueRef>(
+                        const_cast<void *>(selectedRange.get()))) == kAXValueTypeCFRange &&
+                    AXValueGetValue(
+                        static_cast<AXValueRef>(const_cast<void *>(selectedRange.get())),
+                        kAXValueTypeCFRange, &range);
+                if (hasRange &&
+                    (range.location < 0 || range.length < 0 || range.length > maximumText)) {
+                    status = 0;
                 } else {
-                    Attribute selectedRange(element, kAXSelectedTextRangeAttribute);
-                    CFRange range{};
-                    const bool hasRange =
-                        selectedRange.is(AXValueGetTypeID()) &&
-                        AXValueGetType(static_cast<AXValueRef>(
-                            const_cast<void *>(selectedRange.get()))) == kAXValueTypeCFRange &&
-                        AXValueGetValue(
-                            static_cast<AXValueRef>(const_cast<void *>(selectedRange.get())),
-                            kAXValueTypeCFRange, &range);
-                    if (hasRange &&
-                        (range.location < 0 || range.length < 0 || range.length > maximumText)) {
+                    Attribute selection(element, kAXSelectedTextAttribute);
+                    if (selection.is(CFStringGetTypeID())) {
+                        text = stringValue(selection.get());
                         status = 0;
-                    } else {
-                        Attribute selection(element, kAXSelectedTextAttribute);
-                        if (selection.is(CFStringGetTypeID())) {
-                            text = stringValue(selection.get());
-                            status = 0;
-                        }
                     }
                 }
             }
         }
-        CFRelease(app);
+    }
+    CFRelease(app);
+    *result = text;
+    return status;
+}
+
+// Keep AX queries off the UI thread, bound their messaging timeout, and allow only one read at a
+// time.
+class MacSelectionReader : public QObject {
+    Q_OBJECT
+  public:
+    void read(pid_t pid, quint64 epoch) {
+        QString text;
+        const int status = focusedSelection(pid, &text);
         emit ready(epoch, text, status);
     }
   signals:
@@ -324,5 +330,162 @@ void AccessibilitySelection::setArmed(bool value, quint64 generation) {
     impl->arm(value, generation);
 }
 bool AccessibilitySelection::isArmed() const { return impl->armed; }
+
+namespace {
+// The key that types "c" in the current ASCII-capable layout, so ⌘C still means Copy for Dvorak
+// and other layouts. U.S. QWERTY's key is the fallback.
+CGKeyCode copyKeyCode() {
+    CGKeyCode result = kVK_ANSI_C;
+    TISInputSourceRef source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource();
+    if (!source)
+        return result;
+    auto data =
+        static_cast<CFDataRef>(TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData));
+    if (data) {
+        auto layout = reinterpret_cast<const UCKeyboardLayout *>(CFDataGetBytePtr(data));
+        for (CGKeyCode code = 0; code < 128; ++code) {
+            UInt32 dead = 0;
+            UniChar characters[4];
+            UniCharCount length = 0;
+            if (UCKeyTranslate(layout, code, kUCKeyActionDown, 0, LMGetKbdType(),
+                               kUCKeyTranslateNoDeadKeysBit, &dead, 4, &length,
+                               characters) == noErr &&
+                length == 1 && characters[0] == 'c') {
+                result = code;
+                break;
+            }
+        }
+    }
+    CFRelease(source);
+    return result;
+}
+
+constexpr CGEventFlags heldModifiers = kCGEventFlagMaskCommand | kCGEventFlagMaskAlternate |
+                                       kCGEventFlagMaskShift | kCGEventFlagMaskControl;
+
+// Waits for the shortcut's keys to be released, sends ⌘C to the source app, then reads and
+// restores the pasteboard. Runs on the UI thread through timers and never blocks it.
+struct SelectionCopy {
+    QPointer<QObject> owner;
+    pid_t pid;
+    std::function<void(QString, QString)> done;
+    std::function<void()> restore;
+    NSInteger before = 0;
+    QElapsedTimer clock;
+
+    void waitForRelease() {
+        if (!owner)
+            return;
+        const bool held =
+            CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState) & heldModifiers;
+        // A key still held after 600 ms is not part of the shortcut; copy anyway.
+        if (held && clock.elapsed() < 600) {
+            QTimer::singleShot(15, owner, [this] { waitForRelease(); });
+            return;
+        }
+        NSPasteboard *board = NSPasteboard.generalPasteboard;
+        restore = NativeMac::preservePasteboard(board);
+        before = board.changeCount;
+        const CGKeyCode key = copyKeyCode();
+        CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
+        for (const bool down : {true, false}) {
+            CGEventRef event = CGEventCreateKeyboardEvent(source, key, down);
+            CGEventSetFlags(event, kCGEventFlagMaskCommand);
+            CGEventPostToPid(pid, event);
+            CFRelease(event);
+        }
+        if (source)
+            CFRelease(source);
+        clock.restart();
+        QTimer::singleShot(20, owner, [this] { waitForCopy(); });
+    }
+    void waitForCopy() {
+        if (!owner)
+            return;
+        NSPasteboard *board = NSPasteboard.generalPasteboard;
+        if (board.changeCount == before && clock.elapsed() < 500) {
+            QTimer::singleShot(20, owner, [this] { waitForCopy(); });
+            return;
+        }
+        QString text;
+        if (board.changeCount != before) {
+            text = QString::fromNSString([board stringForType:NSPasteboardTypeString]);
+            restore();
+        }
+        auto finish = std::move(done);
+        delete this;
+        if (text.trimmed().isEmpty())
+            finish({}, {});
+        else
+            finish(text.left(maximumText), {});
+    }
+};
+} // namespace
+
+namespace NativeMac {
+std::function<void()> preservePasteboard(NSPasteboard *board) {
+    // Copy every representation now: promised data may not outlive the source app's next copy.
+    NSMutableArray<NSPasteboardItem *> *items = [NSMutableArray array];
+    for (NSPasteboardItem *item in board.pasteboardItems) {
+        NSPasteboardItem *copy = [NSPasteboardItem new];
+        for (NSPasteboardType type in item.types)
+            if (NSData *data = [item dataForType:type])
+                [copy setData:data forType:type];
+        [items addObject:copy];
+    }
+    return [board, items] {
+        [board clearContents];
+        if (items.count)
+            [board writeObjects:items];
+    };
+}
+
+void readSelection(QObject *owner, std::function<void(QString, QString)> done) {
+    if (!AXIsProcessTrusted()) {
+        const void *keys[] = {kAXTrustedCheckOptionPrompt};
+        const void *values[] = {kCFBooleanTrue};
+        auto options =
+            CFDictionaryCreate(kCFAllocatorDefault, keys, values, 1, &kCFTypeDictionaryKeyCallBacks,
+                               &kCFTypeDictionaryValueCallBacks);
+        AXIsProcessTrustedWithOptions(options);
+        CFRelease(options);
+        done({}, "Allow Ranslator in System Settings → Privacy & Security → Accessibility, then "
+                 "press the shortcut again.");
+        return;
+    }
+    if (IsSecureEventInputEnabled()) {
+        done({}, "A password field is active. Ranslator does not read secure input.");
+        return;
+    }
+    NSRunningApplication *frontmost = NSWorkspace.sharedWorkspace.frontmostApplication;
+    const pid_t pid = frontmost ? frontmost.processIdentifier : 0;
+    if (pid <= 0 || pid == QCoreApplication::applicationPid()) {
+        done({}, {});
+        return;
+    }
+    QPointer<QObject> guard(owner);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      QString text;
+      const int status = focusedSelection(pid, &text);
+      QMetaObject::invokeMethod(
+          qApp,
+          [guard, pid, text, status, done] {
+              if (!guard)
+                  return;
+              if (status == 0 && !text.trimmed().isEmpty()) {
+                  done(text, {});
+              } else if (status == 2) {
+                  done({}, "A password field is active. Ranslator does not read secure input.");
+              } else {
+                  // Browsers, Electron apps and terminals often keep their selection out of AX.
+                  auto *copy = new SelectionCopy{guard, pid, done, {}, 0, {}};
+                  copy->clock.start();
+                  copy->waitForRelease();
+              }
+          },
+          Qt::QueuedConnection);
+    });
+}
+} // namespace NativeMac
 
 #include "accessibility_macos.moc"

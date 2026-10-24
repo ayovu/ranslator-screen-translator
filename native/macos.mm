@@ -1,4 +1,5 @@
 #include "macos.hpp"
+#include "actions.hpp"
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
@@ -243,8 +244,10 @@ void MacShortcuts::bind(const QJsonObject &config, std::function<void(QString)> 
         return;
     }
     UInt32 identifier = 0;
-    for (const auto &id : {"once", "continuous", "snapshot"}) {
+    for (const auto &id : shortcutActions) {
         const auto sequence = config[id].toObject()["sequence"].toString();
+        if (sequence.trimmed().isEmpty())
+            continue;
         if (const auto flags = modifierChord(sequence)) {
             impl->modifiers.insert(*flags, id);
             continue;

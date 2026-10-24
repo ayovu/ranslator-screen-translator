@@ -1,4 +1,5 @@
 #include "accessibility.hpp"
+#include "actions.hpp"
 #include "autostart.hpp"
 #include "capture.hpp"
 #include "design.hpp"
@@ -1343,6 +1344,8 @@ class Window : public GlassWindow {
     QPoint snapshotOffset;
     QString translatedSource, translatedTarget;
     bool smokeMode;
+    bool readingSelection = false;
+    QElapsedTimer ignoreClipboardUntil;
     bool selectionFocus = false;
     unsigned captureGeneration = 0;
     bool captureNeedsFrameDelay = false;
@@ -1429,6 +1432,12 @@ class Window : public GlassWindow {
                 sourceText->setFocus(Qt::OtherFocusReason);
         });
     }
+    QString readyHint() const {
+        return config["translate_selection"].toObject()["sequence"].toString().isEmpty()
+                   ? UiText::tr("Select anywhere with %1").arg(bindingDescription("once"))
+                   : UiText::tr("Select text, then press %1")
+                         .arg(bindingDescription("translate_selection"));
+    }
     QString bindingDescription(const char *id) const {
         auto b = config[id].toObject();
         return b["sequence"].toString() +
@@ -1507,6 +1516,33 @@ class Window : public GlassWindow {
                 loadImage(url.toLocalFile(), captureScreen, true);
             },
             config["capture_mode"].toString("auto"));
+    }
+    // Translate selection reads what is already selected in the frontmost application.
+    void readSelection() {
+        auto finish = [this](const QString &text, const QString &error) {
+            // A copy fallback changes and then restores the clipboard; neither is a new selection.
+            ignoreClipboardUntil.start();
+            send(error.isEmpty() ? QJsonObject{{"type", "selection_read"}, {"text", text}}
+                                 : QJsonObject{{"type", "selection_read"}, {"error", error}});
+        };
+#ifdef Q_OS_MACOS
+        ignoreClipboardUntil.invalidate();
+        readingSelection = true;
+        NativeMac::readSelection(this, [this, finish](QString text, QString error) {
+            readingSelection = false;
+            finish(text, error);
+        });
+#else
+        if (QGuiApplication::platformName() == "xcb")
+            finish(QApplication::clipboard()->text(QClipboard::Selection), {});
+        else
+            finish({}, UiText::tr("This desktop does not share the current selection. Use Select "
+                                  "once or Snapshot instead."));
+#endif
+    }
+    bool clipboardChangeIsOurs() const {
+        return readingSelection ||
+               (ignoreClipboardUntil.isValid() && ignoreClipboardUntil.elapsed() < 1500);
     }
     void capture() {
         captureNeedsFrameDelay =
@@ -1603,7 +1639,7 @@ class Window : public GlassWindow {
                     if (generation != captureGeneration)
                         return;
                     if (!error.isEmpty()) {
-                        receive({{"type", "error"}, {"text", error}});
+                        receive({{"type", "error"}, { "text", error }});
                         return;
                     }
                     auto finish = [this, generation](QImage captured) {
@@ -1615,7 +1651,8 @@ class Window : public GlassWindow {
                             loadImage(path, captureScreen);
                         else
                             receive({{"type", "error"},
-                                     {"text", UiText::tr("Could not save the captured image.")}});
+                                     { "text",
+                                       UiText::tr("Could not save the captured image.") }});
                         QFile::remove(path);
                     };
                     if (mode == "region" || mode == "picker")
@@ -1689,8 +1726,10 @@ class Window : public GlassWindow {
     }
     QString validateShortcuts(const QJsonObject &candidate) {
         QSet<QString> used;
-        for (const auto &id : {"once", "continuous", "snapshot"}) {
+        for (const auto &id : shortcutActions) {
             const auto sequence = candidate[id].toObject()["sequence"].toString().trimmed();
+            if (id == "translate_selection" && sequence.isEmpty())
+                continue;
             if (modifierOnly(sequence))
                 continue;
             const auto key = QKeySequence::fromString(sequence, QKeySequence::PortableText);
@@ -1748,9 +1787,9 @@ class Window : public GlassWindow {
                 delete a;
             }
             shortcuts.clear();
-            for (const auto &id : {"once", "continuous", "snapshot"}) {
+            for (const auto &id : shortcutActions) {
                 QString sequence = config[id].toObject()["sequence"].toString();
-                if (modifierOnly(sequence))
+                if (sequence.trimmed().isEmpty() || modifierOnly(sequence))
                     continue;
                 auto key = QKeySequence::fromString(sequence, QKeySequence::PortableText);
                 if (shortcutConflict(key)) {
@@ -2394,11 +2433,12 @@ class Window : public GlassWindow {
                               UiText::tr("Stay in your flow. Call Ranslator with a gesture."));
         QList<ShortcutRecorder *> sequences;
         QList<QSpinBox *> taps;
-        for (const auto &id : {"once", "continuous", "snapshot"}) {
+        for (const auto &id : shortcutActions) {
             auto b = config[id].toObject();
-            const QString title = id == QString("once")         ? UiText::tr("Select once")
-                                  : id == QString("continuous") ? UiText::tr("Toggle continuous")
-                                                                : UiText::tr("Snapshot");
+            const QString title = id == "translate_selection" ? UiText::tr("Translate selection")
+                                  : id == "once"              ? UiText::tr("Select once")
+                                  : id == "continuous"        ? UiText::tr("Toggle continuous")
+                                                              : UiText::tr("Snapshot");
             auto *row = new QWidget;
             auto *h = new QHBoxLayout(row);
             h->setContentsMargins(0, 0, 0, 0);
@@ -2421,6 +2461,14 @@ class Window : public GlassWindow {
             tap->setAccessibleName(QString(UiText::tr("Shortcut presses: %1")).arg(title));
             h->addWidget(seq, 1);
             h->addWidget(tap);
+            if (id == "translate_selection") {
+                // Optional: the other actions remain available without it.
+                auto *off = button(UiText::tr("Turn off"));
+                off->setObjectName("shortcutClear_translate_selection");
+                off->setAccessibleName(UiText::tr("Turn off shortcut: %1").arg(title));
+                connect(off, &QPushButton::clicked, seq, [seq] { seq->clear(); });
+                h->addWidget(off);
+            }
             sequences << seq;
             taps << tap;
             bindings->addRow(title, row);
@@ -2438,6 +2486,15 @@ class Window : public GlassWindow {
         auto *clipboard = new QCheckBox(UiText::tr("Also translate copied text while listening"));
         clipboard->setChecked(config["watch_clipboard"].toBool());
         bindings->addRow(clipboard);
+        auto *rules = label(
+            UiText::tr(
+                "Choose how selected text gets translated. Translate selection: select text "
+                "first, then press the shortcut. Select once: press the shortcut, then select. "
+                "Toggle continuous: every new selection is translated until you press it again."),
+            "muted");
+        rules->setObjectName("shortcutRules");
+        rules->setWordWrap(true);
+        bindings->insertRow(2, rules); // After the page heading and subtitle.
         auto *help = label(
             UiText::tr(
                 "Click a shortcut to record it, then press and release the keys. Esc cancels; "
@@ -2449,6 +2506,15 @@ class Window : public GlassWindow {
             "muted");
         help->setWordWrap(true);
         bindings->addRow(help);
+#ifdef Q_OS_MACOS
+        auto *copyHelp = label(
+            UiText::tr("Translate selection reads the selection through Accessibility. In apps "
+                       "that do not share it, Ranslator copies it with ⌘C and then restores your "
+                       "clipboard. Password fields are never read."),
+            "muted");
+        copyHelp->setWordWrap(true);
+        bindings->addRow(copyHelp);
+#endif
         auto *ocr = page(UiText::tr("Screen text"),
                          UiText::tr("Turn the words you see into words you can select."));
         auto *copySnapshot = new QCheckBox(UiText::tr("Copy selected snapshot text to clipboard"));
@@ -2664,7 +2730,7 @@ class Window : public GlassWindow {
             candidate["reduce_transparency"] = opaque->isChecked();
             candidate["reduce_motion"] = motion->isChecked();
             int i = 0;
-            for (const auto &id : {"once", "continuous", "snapshot"}) {
+            for (const auto &id : shortcutActions) {
                 candidate[id] =
                     QJsonObject{{"sequence", sequences[i]->sequence()}, {"taps", taps[i]->value()}};
                 ++i;
@@ -2873,8 +2939,7 @@ class Window : public GlassWindow {
         connect(continuousButton, &QPushButton::clicked, this, [] { action("continuous"); });
         connect(snapshot, &QPushButton::clicked, this, [] { action("snapshot"); });
         layout->addWidget(modeSurface);
-        status =
-            label(UiText::tr("Select anywhere with %1").arg(bindingDescription("once")), "status");
+        status = label(readyHint(), "status");
         status->setAlignment(Qt::AlignCenter);
         status->setWordWrap(true);
         layout->addWidget(status);
@@ -2913,7 +2978,8 @@ class Window : public GlassWindow {
                           {"text", QApplication::clipboard()->text(QClipboard::Selection)}});
             });
             connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this] {
-                if (config["watch_clipboard"].toBool() && QApplication::activeWindow() == nullptr)
+                if (config["watch_clipboard"].toBool() && QApplication::activeWindow() == nullptr &&
+                    !clipboardChangeIsOurs())
                     send({{"type", "selection"}, {"text", QApplication::clipboard()->text()}});
             });
         }
@@ -3104,7 +3170,16 @@ class Window : public GlassWindow {
             syncSelectionFocus();
         } else if (type == "capture")
             capture();
-        else if (type == "busy") {
+        else if (type == "read_selection")
+            readSelection();
+        else if (type == "selection_missing") {
+            const auto shortcut = bindingDescription("translate_selection");
+            receive({{"type", "error"},
+                     {"text",
+                      shortcut.isEmpty()
+                          ? UiText::tr("Select some text first, then try again.")
+                          : UiText::tr("Select some text first, then press %1.").arg(shortcut)}});
+        } else if (type == "busy") {
             working(true);
             setStatus(value["text"].toString());
         } else if (type == "selected") {

@@ -22,6 +22,10 @@
     "sequence": "Ctrl+Alt+O",
     "taps": 1
   },
+  "translate_selection": {
+    "sequence": "Alt+Shift+C",
+    "taps": 1
+  },
   "tap_window_ms": 450,
   "selection_delay_ms": 500,
   "watch_clipboard": false,

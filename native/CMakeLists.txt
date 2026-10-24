@@ -95,6 +95,13 @@ if(RANSLATOR_UI_TESTS)
     target_compile_definitions(ui_tests PRIVATE HAVE_X11_SHORTCUTS)
   endif()
   add_test(NAME native_interactions COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=offscreen $<TARGET_FILE:ui_tests>)
+  if(APPLE)
+    add_executable(macos_tests ../tests/macos.mm accessibility.cpp ${NATIVE_PLATFORM_SOURCES})
+    set_source_files_properties(../tests/macos.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_include_directories(macos_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(macos_tests PRIVATE ${NATIVE_QT_LIBRARIES} ${NATIVE_PLATFORM_LIBRARIES} Qt6::Test)
+    add_test(NAME macos_adapters COMMAND ${CMAKE_COMMAND} -E env QT_QPA_PLATFORM=offscreen $<TARGET_FILE:macos_tests>)
+  endif()
 endif()
 
 # English is source text and requires no Linguist dependency. Community catalogs

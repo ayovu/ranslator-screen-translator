@@ -1,4 +1,5 @@
 #include "portal.hpp"
+#include "actions.hpp"
 #ifdef Q_OS_LINUX
 #include <QDBusConnection>
 #include <QDBusInterface>
@@ -220,8 +221,10 @@ void Portal::bindShortcuts(const QJsonObject &config, std::function<void(QString
                 return;
             }
             QList<PortalShortcut> shortcuts;
-            for (const auto &id : {"once", "continuous", "snapshot"}) {
+            for (const auto &id : shortcutActions) {
                 QString sequence = config[id].toObject()["sequence"].toString();
+                if (sequence.trimmed().isEmpty())
+                    continue;
                 auto parts = sequence.split('+');
                 bool modifiers = true;
                 for (auto &part : parts) {

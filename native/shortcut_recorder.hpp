@@ -69,7 +69,7 @@ class ShortcutRecorder final : public QPushButton {
         current.clear();
         held.clear();
         finished.start();
-        setText(saved);
+        setText(label());
         setAccessibleDescription(
             UiText::tr("Activate to record a shortcut. Escape cancels recording."));
         if (stateChanged)
@@ -217,7 +217,7 @@ class ShortcutRecorder final : public QPushButton {
   public:
     ShortcutRecorder(QString sequence, std::function<void(bool)> changed, QWidget *parent = nullptr)
         : QPushButton(parent), saved(std::move(sequence)), stateChanged(std::move(changed)) {
-        setText(saved);
+        setText(label());
         setAutoDefault(false);
         setFocusPolicy(Qt::StrongFocus);
         setCursor(Qt::PointingHandCursor);
@@ -238,6 +238,13 @@ class ShortcutRecorder final : public QPushButton {
     QSize sizeHint() const override { return {260, 42}; }
     QSize minimumSizeHint() const override { return {160, 42}; }
     QString sequence() const { return saved; }
+    // An empty sequence leaves an optional action without a shortcut.
+    void clear() {
+        end(false);
+        saved.clear();
+        setText(label());
+    }
+    QString label() const { return saved.isEmpty() ? UiText::tr("Not set") : saved; }
     bool isRecording() const { return listening; }
     static ShortcutRecorder *active() { return current; }
     static bool justFinished() { return finished.isValid() && finished.elapsed() < 250; }

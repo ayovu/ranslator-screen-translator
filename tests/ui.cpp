@@ -686,6 +686,41 @@ class UiTests : public QObject {
         QCOMPARE(args[args.indexOf("--delay") + 1], "0");
         dialog->close();
     }
+    void translate_selection_comes_first_can_be_turned_off_and_needs_its_own_chord() {
+        Window window(defaults(), true);
+        QVERIFY(window.findChild<QLabel *>("status")->text().contains("Alt+Shift+C"));
+        named(&window, "Open settings")->click();
+        auto *dialog = window.findChild<QDialog *>();
+        named(dialog, "Shortcuts")->click();
+        // ShortcutRecorder has no Q_OBJECT, so look it up as the button it is.
+        auto *translate = dynamic_cast<ShortcutRecorder *>(
+            dialog->findChild<QPushButton *>("shortcut_translate_selection"));
+        auto *once =
+            dynamic_cast<ShortcutRecorder *>(dialog->findChild<QPushButton *>("shortcut_once"));
+        QVERIFY(translate && once);
+        QCOMPARE(translate->sequence(), QString("Alt+Shift+C"));
+        // Select-then-press is listed before the listening modes.
+        QTRY_VERIFY(translate->mapTo(dialog, QPoint()).y() < once->mapTo(dialog, QPoint()).y());
+        const auto saves = [] {
+            return std::count_if(messages.begin(), messages.end(), [](const QJsonObject &message) {
+                return message["type"].toString() == "save_config";
+            });
+        };
+        const auto before = saves();
+        translate->begin();
+        translate->acceptRegisteredShortcut(once->sequence());
+        QTRY_VERIFY(!translate->isRecording());
+        named(dialog, "Save")->click();
+        QCOMPARE(saves(), before); // Each action needs its own chord.
+        dialog->findChild<QPushButton *>("shortcutClear_translate_selection")->click();
+        QCOMPARE(translate->text(), QString("Not set"));
+        named(dialog, "Save")->click();
+        QCOMPARE(saves(), before + 1);
+        const auto saved = sent["config"].toObject();
+        QCOMPARE(saved["translate_selection"].toObject()["sequence"].toString(), QString());
+        QCOMPARE(saved["once"].toObject()["sequence"].toString(), once->sequence());
+        dialog->close();
+    }
     void ocr_engine_setting_saves_and_disables_model_controls_vision_does_not_use() {
         auto config = defaults();
         config["ocr_engine"] = "auto";

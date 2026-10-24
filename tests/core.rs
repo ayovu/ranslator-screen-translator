@@ -202,6 +202,36 @@ fn config_rejects_invalid_limits_duplicate_bindings_and_language_pairs() {
     assert!(config.validate().is_err());
 }
 #[test]
+fn translate_selection_shortcut_is_adopted_without_breaking_older_settings() {
+    let config = Config::default();
+    assert_eq!(config.translate_selection.sequence, "Alt+Shift+C");
+    assert!(
+        config
+            .bindings()
+            .iter()
+            .any(|(id, _)| *id == "translate_selection")
+    );
+    // Settings saved before the action existed gain its default chord.
+    let mut older: Config =
+        serde_json::from_str(r#"{"once":{"sequence":"Ctrl+Alt+R","taps":1}}"#).unwrap();
+    older.adopt_new_bindings();
+    assert_eq!(older.translate_selection.sequence, "Alt+Shift+C");
+    older.validate().unwrap();
+    // When another action already owns that chord, the new shortcut starts disabled.
+    let mut taken: Config =
+        serde_json::from_str(r#"{"snapshot":{"sequence":"alt+shift+c","taps":1}}"#).unwrap();
+    taken.adopt_new_bindings();
+    assert!(taken.translate_selection.sequence.is_empty());
+    taken.validate().unwrap();
+    assert_eq!(taken.snapshot.sequence, "alt+shift+c");
+    // Disabled is valid, but a chord shared with another action is still rejected.
+    let mut config = Config::default();
+    config.translate_selection.sequence.clear();
+    config.validate().unwrap();
+    config.translate_selection.sequence = config.once.sequence.clone();
+    assert!(config.validate().is_err());
+}
+#[test]
 fn remote_credentials_require_https_and_never_use_url_auth() {
     assert!(provider::validate_endpoint("https://example.com/v1").is_ok());
     assert!(provider::validate_endpoint("http://127.0.0.1:11434").is_ok());
