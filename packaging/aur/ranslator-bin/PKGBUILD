@@ -1,6 +1,6 @@
 # Prebuilt upstream release; keep bundled libraries private under /usr/lib/ranslator.
 pkgname=ranslator-bin
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Translate selected and on-screen text with OCR and floating popups'
 arch=('x86_64')
@@ -24,7 +24,7 @@ source=(
   'LICENSE'
 )
 sha256sums=(
-  '7c086ef5c13ec07403c485669a48ca8f4c511bd355e4b85bd4f03be8539a0ce1'
+  'b75d034406944f6ab6652a6b0d32ad2054ca15e77f966213f5f2160790eb820c'
   '3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986'
 )
 

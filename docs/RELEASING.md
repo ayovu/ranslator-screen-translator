@@ -67,7 +67,7 @@ verify that it matches the source used to build your attachments. See GitHub's
 ## AUR
 
 Not published yet. The [AUR recipe and publishing guide](../packaging/aur/README.md)
-provide `ranslator-bin` for the public v0.1.0 x86_64 prerelease. It downloads the
+provide `ranslator-bin` for the public v0.2.0 x86_64 prerelease. It downloads the
 versioned portable archive with a fixed SHA-256 and installs its private runtime
 under `/usr/lib/ranslator`. AUR stores the recipe, not the binary release.
 

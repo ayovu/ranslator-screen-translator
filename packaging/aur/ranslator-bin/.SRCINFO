@@ -1,6 +1,6 @@
 pkgbase = ranslator-bin
 	pkgdesc = Translate selected and on-screen text with OCR and floating popups
-	pkgver = 0.1.0
+	pkgver = 0.2.0
 	pkgrel = 1
 	url = https://github.com/ayovu/ranslator-screen-translator
 	arch = x86_64
@@ -23,13 +23,13 @@ pkgbase = ranslator-bin
 	optdepends = xdg-desktop-portal: desktop capture and shortcuts with a compatible portal backend
 	optdepends = at-spi2-core: selected text from accessible applications
 	optdepends = ollama: local AI translation models
-	provides = ranslator=0.1.0
+	provides = ranslator=0.2.0
 	conflicts = ranslator
 	options = !strip
 	options = !debug
-	source = https://github.com/ayovu/ranslator-screen-translator/releases/download/v0.1.0/Ranslator-0.1.0-linux-x86_64.tar.gz
+	source = https://github.com/ayovu/ranslator-screen-translator/releases/download/v0.2.0/Ranslator-0.2.0-linux-x86_64.tar.gz
 	source = LICENSE
-	sha256sums = 7c086ef5c13ec07403c485669a48ca8f4c511bd355e4b85bd4f03be8539a0ce1
+	sha256sums = b75d034406944f6ab6652a6b0d32ad2054ca15e77f966213f5f2160790eb820c
 	sha256sums = 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
 
 pkgname = ranslator-bin

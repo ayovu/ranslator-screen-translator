@@ -1,6 +1,6 @@
 # Publish Ranslator on AUR
 
-The `ranslator-bin/` directory contains a recipe for the published **v0.1.0
+The `ranslator-bin/` directory contains a recipe for the published **v0.2.0
 prerelease, x86_64 only**. AUR publication is a separate, manual step. GitHub
 Actions are not required.
 
@@ -112,12 +112,12 @@ Copy `PKGBUILD`, `.SRCINFO` and `LICENSE` from this project's
 makepkg --printsrcinfo > .SRCINFO
 git add PKGBUILD .SRCINFO LICENSE
 git diff --cached
-git commit -m "Add ranslator-bin 0.1.0"
+git commit -m "Add ranslator-bin 0.2.0"
 git push -u origin master
 ```
 
 Do not upload the application sources, binary archive or generated package to
-AUR. After the push succeeds and the package page shows version `0.1.0-1`, other
+AUR. After the push succeeds and the package page shows version `0.2.0-1`, other
 users can install it with `yay -S ranslator-bin`. Add an AUR link to the main
 README only after that publication is verified.
 
