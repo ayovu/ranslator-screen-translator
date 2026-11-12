@@ -56,4 +56,25 @@ mv "$desktop.new" "$desktop"
 if command -v update-desktop-database >/dev/null; then
     update-desktop-database "$prefix/share/applications"
 fi
+# Keep this installer standalone: release downloads may contain only this script and the AppImage.
+# Replacing an SVG inside an existing directory does not invalidate desktop icon caches.
+touch "$prefix/share/icons/hicolor"
+if command -v gtk-update-icon-cache >/dev/null; then
+    gtk-update-icon-cache -f -t "$prefix/share/icons/hicolor" || printf 'Warning: could not refresh the icon cache.\n' >&2
+fi
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *KDE* && -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    for cache_builder in kbuildsycoca6 kbuildsycoca5; do
+        if command -v "$cache_builder" >/dev/null; then
+            "$cache_builder" --noincremental || printf 'Warning: could not refresh the KDE application index.\n' >&2
+            break
+        fi
+    done
+    if command -v dbus-send >/dev/null; then
+        # KIconLoader::emitChange: also invalidate icons held by the running panel and launcher.
+        for icon_group in 0 1 2 3 4 5; do
+            dbus-send --session --type=signal /KIconLoader org.kde.KIconLoader.iconChanged "int32:$icon_group" \
+                || printf 'Warning: could not notify KDE of the icon change.\n' >&2
+        done
+    fi
+fi
 printf 'Installed %s. Launch Ranslator from the application menu; restart any previous running version.\n' "$prefix/bin/ranslator"

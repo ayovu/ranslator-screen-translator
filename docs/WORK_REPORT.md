@@ -44,3 +44,15 @@ Flatpak boundaries, accessibility and autostart. Package reports record artifact
 
 See [platform checks](PORTABILITY.md), [translations](TRANSLATING.md) and
 [release requirements](RELEASING.md).
+
+## Desktop icon refresh — 2026-10-19
+
+- Confirmed the installed SVG and current tray use the blue glass icon. Refreshed
+  the local icon cache and KDE application index, and notified running icon loaders.
+- Both Linux installers now refresh caches after installing the icon; the AppImage
+  installer remains standalone. No application artwork or translation behavior changed.
+- Validation: `scripts/check-build.sh` passed; the KDE-loaded icon matches the source
+  pixel for pixel. Installation checks use disposable prefixes.
+- Remaining check: visually confirm the reopened Plasma application search and taskbar.
+  Desktop automation was unavailable in this session. Previously published installers
+  retain their old behavior until updated; existing release binaries were not replaced.
