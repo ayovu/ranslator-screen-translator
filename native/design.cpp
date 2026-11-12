@@ -1,8 +1,6 @@
 #include "design.hpp"
 #ifdef Q_OS_LINUX
-#include <QDBusInterface>
-#include <QDBusReply>
-#include <QDBusVariant>
+#include "appearance_linux.hpp"
 #endif
 #ifdef Q_OS_MACOS
 #include "macos.hpp"
@@ -79,7 +77,59 @@ class RenderTrace : public QObject {
 namespace Design {
 static Theme current;
 static bool systemDark = false;
+static QColor systemAccent{"#487ff2"};
+static QString systemFontFamily;
+static QJsonObject lastConfig;
+static bool configured = false, applyingStyle = false;
+#ifdef Q_OS_LINUX
+static NativeLinux::AppearanceSettings *desktopSettings = nullptr;
+#endif
 Theme &theme() { return current; }
+
+QColor Theme::onAccent() const {
+    const auto linear = [](double v) {
+        return v <= .04045 ? v / 12.92 : std::pow((v + .055) / 1.055, 2.4);
+    };
+    const double luminance = .2126 * linear(accent.redF()) + .7152 * linear(accent.greenF()) +
+                             .0722 * linear(accent.blueF());
+    // Choose the higher contrast foreground, including very light desktop accent colors.
+    return (luminance + .05) / .05 > 1.05 / (luminance + .05) ? QColor(Qt::black)
+                                                              : QColor(Qt::white);
+}
+
+static QColor paletteAccent(const QPalette &palette) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    auto color = palette.color(QPalette::Active, QPalette::Accent);
+#else
+    auto color = palette.color(QPalette::Active, QPalette::Highlight);
+#endif
+    return color.isValid() && color.alpha() > 0 ? color : QColor("#487ff2");
+}
+
+static void finishFades(QWidget *root) {
+    auto widgets = root->findChildren<QWidget *>();
+    widgets.prepend(root);
+    for (auto *widget : widgets)
+        if (auto *effect = widget->graphicsEffect();
+            effect && effect->objectName() == "ranslatorFade")
+            widget->setGraphicsEffect(nullptr);
+}
+
+class PaletteObserver final : public QObject {
+    bool eventFilter(QObject *object, QEvent *event) override {
+        if (object == qApp && event->type() == QEvent::ApplicationPaletteChange && !applyingStyle) {
+            const auto palette = qApp->palette();
+            systemDark = palette.color(QPalette::Window).lightness() < 128;
+            systemAccent = paletteAccent(palette);
+            if (configured)
+                configure(lastConfig);
+        }
+        return false;
+    }
+
+  public:
+    using QObject::QObject;
+};
 
 QFont textFont(QFont font, const QString &language) {
     const auto code = language.toLower().replace('_', '-');
@@ -98,14 +148,20 @@ QFont textFont(QFont font, const QString &language) {
                      : code == "zh-tw" || code == "zh-hk" || code.startsWith("zh-hant")
                          ? "Noto Sans CJK TC"
                          : "Noto Sans CJK SC";
-    font.setFamilies({"Inter Variable", "Noto Sans Arabic", "Noto Sans Devanagari",
-                      "Noto Sans Hebrew", "Noto Sans Bengali", "Noto Sans Thai", cjk});
+    QStringList families{
+        systemFontFamily,   "Inter Variable",    "Noto Sans Arabic", "Noto Sans Devanagari",
+        "Noto Sans Hebrew", "Noto Sans Bengali", "Noto Sans Thai",   cjk};
+    families.removeAll(QString());
+    families.removeDuplicates();
+    font.setFamilies(families);
     return font;
 }
 
 void initialize() {
     initializeResources();
     systemDark = qApp->palette().color(QPalette::Window).lightness() < 128;
+    systemAccent = paletteAccent(qApp->palette());
+    systemFontFamily = QFontDatabase::systemFont(QFontDatabase::GeneralFont).family();
     // These controls are drawn by our own material/style sheet. Keep the underlying style
     // deterministic: desktop theme plugins must not add opaque native control backgrounds.
     qApp->setStyle(QStyleFactory::create("Fusion"));
@@ -115,43 +171,57 @@ void initialize() {
     for (const auto &name : QDir(":/design/fonts").entryList({"*.ttf", "*.ttc"}, QDir::Files))
         QFontDatabase::addApplicationFont(":/design/fonts/" + name);
     QFont font = textFont(QFont("Inter Variable"));
-    font.setPixelSize(macStyle ? 13 : 14);
+    font.setPixelSize(13);
     qApp->setFont(font);
+    qApp->installEventFilter(new PaletteObserver(qApp));
 #ifdef Q_OS_LINUX
-    if (QGuiApplication::platformName() != "offscreen") {
-        QDBusInterface settings("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
-                                "org.freedesktop.portal.Settings");
-        settings.setTimeout(500);
-        QDBusReply<QDBusVariant> result =
-            settings.call("Read", "org.freedesktop.appearance", "color-scheme");
-        if (result.isValid()) {
-            const auto value = result.value().variant().toUInt();
-            if (value == 1 || value == 2)
-                systemDark = value == 1;
-        }
+    if (QGuiApplication::platformName() != "offscreen" &&
+        QGuiApplication::platformName() != "minimal") {
+        desktopSettings = new NativeLinux::AppearanceSettings(qApp);
+        QObject::connect(desktopSettings, &NativeLinux::AppearanceSettings::changed, qApp, [] {
+            if (configured)
+                configure(lastConfig);
+        });
     }
 #endif
 }
 
 void configure(const QJsonObject &config) {
-    const auto appearance = config["appearance"].toString("system");
-    const bool dark = appearance == "dark" || (appearance == "system" && systemDark);
+    lastConfig = config;
+    auto preferredDark = systemDark;
+    auto accent = systemAccent;
     bool motion = config["reduce_motion"].toBool();
     bool opaque = config["reduce_transparency"].toBool();
+    bool highContrast = false;
+#ifdef Q_OS_LINUX
+    if (desktopSettings) {
+        const auto &desktop = desktopSettings->appearance();
+        preferredDark = desktop.dark.value_or(systemDark);
+        if (desktop.accent.isValid())
+            accent = desktop.accent;
+        motion = motion || desktop.reducedMotion;
+        highContrast = desktop.highContrast;
+        opaque = opaque || highContrast;
+    }
+#endif
+    const auto appearance = config["appearance"].toString("system");
+    const bool dark = appearance == "dark" || (appearance == "system" && preferredDark);
 #ifdef Q_OS_MACOS
-    // The system accessibility settings apply as well as Ranslator's own switches.
     motion = motion || NativeMac::reduceMotion();
     opaque = opaque || NativeMac::reduceTransparency();
-    current.accent = NativeMac::accentColor(dark);
+    accent = NativeMac::accentColor(dark);
 #endif
-    static bool configured = false;
     if (configured && current.dark == dark && current.reducedMotion == motion &&
-        current.reducedTransparency == opaque)
+        current.reducedTransparency == opaque && current.accent == accent &&
+        current.highContrast == highContrast)
         return;
     current.dark = dark;
     current.reducedMotion = motion;
     current.reducedTransparency = opaque;
+    current.highContrast = highContrast;
+    current.accent = accent;
     configured = true;
+    applyingStyle = true;
     const QString ink = current.ink().name(), muted = current.secondary().name();
     const QString field = current.dark ? "rgba(255,255,255,10)" : "rgba(255,255,255,110)";
     const QString edge = current.dark ? "rgba(255,255,255,26)" : "rgba(255,255,255,160)";
@@ -208,14 +278,19 @@ void configure(const QJsonObject &config) {
       QToolTip { background: %5; color: %1; border: 1px solid %4; padding: 7px; }
     )")
                         .arg(ink, muted, field, edge, popup);
-    if (macStyle) {
-        // Later rules win: macOS type scale, control radii and the user's accent color.
+    {
+        // Shared type scale and control geometry, with the desktop's accent color.
         const QString accent = current.accent.name();
-        const QString macField = current.dark ? "rgba(255,255,255,14)" : "rgba(255,255,255,190)";
-        const QString macEdge = current.dark ? "rgba(255,255,255,22)" : "rgba(0,0,0,26)";
-        const QString macPopup = current.dark ? "#2a2a2e" : "#fbfbfd";
+        const QString controlField = current.dark ? "rgba(255,255,255,14)" : "rgba(255,255,255,96)";
+        const QString controlEdge = current.highContrast ? current.ink().name()
+                                    : current.dark       ? "rgba(255,255,255,22)"
+                                                         : "rgba(0,0,0,26)";
+        const QString onAccent = current.onAccent().name();
+        const QString check =
+            current.onAccent() == QColor(Qt::black) ? "check-dark.svg" : "check.svg";
+        const QString menuSurface = current.dark ? "#2a2a2e" : "#fbfbfd";
         sheet += QString(R"(
-      QWidget { font-size: 13px; selection-background-color: %1; }
+      QWidget { font-size: 13px; selection-background-color: %1; selection-color: %5; }
       QLabel#heading { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
       QLabel#brand { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
       QLabel#eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; }
@@ -228,25 +303,28 @@ void configure(const QJsonObject &config) {
       QComboBox:focus, QLineEdit:focus, QSpinBox:focus { border: 1px solid %1; }
       QComboBox QAbstractItemView, QMenu { background: %4; border: 1px solid %3; border-radius: 10px; padding: 5px; selection-background-color: %1; }
       QComboBox QAbstractItemView::item { min-height: 22px; padding: 3px 9px; border-radius: 5px; }
-      QComboBox QAbstractItemView::item:selected { background: %1; color: white; }
+      QComboBox QAbstractItemView::item:selected { background: %1; color: %5; }
       QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid %3; border-radius: 4px; background: %2; }
-      QCheckBox::indicator:checked { background: %1; border-color: %1; }
+      QCheckBox::indicator:checked { background: %1; border-color: %1; image: url(:/design/%6); }
       QProgressBar { background: %2; border-radius: 1px; }
       QProgressBar::chunk { background: %1; border-radius: 1px; }
       QSlider::sub-page:horizontal { background: %1; }
-      QPushButton:default { background: %1; }
+      QPushButton:default { background: %1; color: %5; }
       QToolTip { background: %4; border: 1px solid %3; border-radius: 6px; padding: 5px 7px; }
       QComboBox[compactLanguage="true"] { padding: 6px 14px 6px 3px; }
       QComboBox[compactLanguage="true"]::drop-down { width: 14px; }
     )")
-                     .arg(accent, macField, macEdge, macPopup);
+                     .arg(accent, controlField, controlEdge, menuSurface, onAccent, check);
     }
     qApp->setStyleSheet(sheet);
     for (auto *widget : qApp->topLevelWidgets()) {
+        if (motion)
+            finishFades(widget);
         if (widget->property("glassWindow").toBool())
             applyBackdrop(widget);
         widget->update();
     }
+    applyingStyle = false;
 }
 
 static qreal springProgress(qreal t) {
@@ -283,13 +361,15 @@ void applyBackdrop(QWidget *widget) {
     available = QGuiApplication::platformName() != "offscreen" &&
                 KWindowEffects::isEffectAvailable(KWindowEffects::BlurBehind);
     const QRegion region(
-        rounded(QRectF(widget->rect()).adjusted(20, 20, -20, -20), 30).toFillPolygon().toPolygon());
+        rounded(
+            QRectF(widget->rect()).adjusted(windowInset, windowInset, -windowInset, -windowInset),
+            windowRadius)
+            .toFillPolygon()
+            .toPolygon());
     KWindowEffects::enableBlurBehind(widget->windowHandle(),
                                      available && !current.reducedTransparency, region);
     if (KWindowEffects::isEffectAvailable(KWindowEffects::BackgroundContrast))
-        KWindowEffects::enableBackgroundContrast(widget->windowHandle(),
-                                                 available && !current.reducedTransparency, 1.02,
-                                                 current.dark ? .96 : 1.04, 1.15, region);
+        KWindowEffects::enableBackgroundContrast(widget->windowHandle(), false);
 #endif
     current.blur = available;
     widget->setProperty("desktopBlur", available);
@@ -336,9 +416,9 @@ static void paintPreviewMaterial(QPainter &p, QRectF body) {
     scene.render(&p, body, sample.rect(), Qt::IgnoreAspectRatio);
 }
 
-// macOS: the system draws the glass; Ranslator adds a legibility tint, the hairline edge Apple
-// windows have, and a shadow shaped like the body.
-static void paintMacWindow(QWidget *widget, QPainter &p) {
+// AppKit or the Linux compositor supplies blur; the shared painter adds the tint,
+// thin edges and a shadow that follows the visible body. Without blur the tint is opaque.
+static void paintGlassWindow(QWidget *widget, QPainter &p) {
     const QRectF body =
         QRectF(widget->rect()).adjusted(windowInset, windowInset, -windowInset, -windowInset);
     const bool preview = widget->property("designPreview").toBool();
@@ -366,7 +446,7 @@ static void paintMacWindow(QWidget *widget, QPainter &p) {
         paintPreviewMaterial(p, body);
     QColor tint = current.dark ? QColor(22, 22, 26) : QColor(248, 248, 250);
     if (glass)
-        tint.setAlpha(current.dark ? 182 : 150);
+        tint.setAlpha(current.dark ? 182 : (macStyle ? 150 : 196));
     p.fillPath(path, tint);
     p.restore();
     p.setBrush(Qt::NoBrush);
@@ -391,53 +471,7 @@ void paintWindow(QWidget *widget) {
     p.fillRect(widget->rect(), Qt::transparent);
     p.setCompositionMode(QPainter::CompositionMode_SourceOver);
     p.setRenderHint(QPainter::Antialiasing);
-    if (macStyle) {
-        paintMacWindow(widget, p);
-        return;
-    }
-    const QRectF body = QRectF(widget->rect()).adjusted(20, 20, -20, -20);
-    for (int i = 18; i > 0; --i) {
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(10, 24, 49, 2));
-        p.drawRoundedRect(body.adjusted(-i, -i / 2.0, i, i).translated(0, 4), 30 + i, 30 + i);
-    }
-    const auto path = rounded(body, 30);
-    const bool preview = widget->property("designPreview").toBool();
-    const bool transparent =
-        !current.reducedTransparency && (widget->property("desktopBlur").toBool() || preview);
-    p.save();
-    p.setClipPath(path);
-    if (preview) {
-        // The preview has a synthetic backdrop; the running app uses compositor blur.
-        paintPreviewMaterial(p, body);
-    }
-    QLinearGradient material(body.topLeft(), body.bottomRight());
-    if (current.dark) {
-        material.setColorAt(0, QColor(22, 29, 42, transparent ? 212 : 255));
-        material.setColorAt(.5, QColor(16, 22, 32, transparent ? 205 : 255));
-        material.setColorAt(1, QColor(21, 27, 39, transparent ? 222 : 255));
-    } else {
-        material.setColorAt(0, QColor(255, 255, 255, transparent ? 148 : 255));
-        material.setColorAt(.48, QColor(238, 246, 255, transparent ? 120 : 255));
-        material.setColorAt(1, QColor(231, 239, 252, transparent ? 156 : 255));
-    }
-    p.fillPath(path, material);
-    QRadialGradient sheen(body.topLeft() + QPointF(body.width() * .22, 0), body.width() * .85);
-    sheen.setColorAt(0, QColor(255, 255, 255, current.dark ? 6 : 100));
-    sheen.setColorAt(1, Qt::transparent);
-    p.fillPath(path, sheen);
-    p.restore();
-    QLinearGradient rim(body.topLeft(), body.bottomRight());
-    rim.setColorAt(0, QColor(255, 255, 255, current.dark ? 145 : 245));
-    rim.setColorAt(.25, QColor(255, 255, 255, current.dark ? 45 : 60));
-    rim.setColorAt(.52, QColor(100, 135, 190, current.dark ? 22 : 35));
-    rim.setColorAt(.8, QColor(255, 255, 255, current.dark ? 60 : 90));
-    rim.setColorAt(1, QColor(255, 255, 255, current.dark ? 125 : 210));
-    p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(rim, 1.2));
-    p.drawPath(path);
-    p.setPen(QPen(QColor(255, 255, 255, current.dark ? 14 : 75), .8));
-    p.drawRoundedRect(body.adjusted(2, 2, -2, -2), 28, 28);
+    paintGlassWindow(widget, p);
 }
 
 // Two arcs of one circle with arrowheads on the tangent, symmetric under a half turn: the
@@ -516,9 +550,57 @@ static bool drawSymbol(QPainter &p, const QString &glyph, QRectF rect, QColor co
 }
 #endif
 
+#ifdef Q_OS_LINUX
+static bool drawDesktopSymbol(QPainter &p, const QString &glyph, QRectF rect, QColor color) {
+    // Prefer monochrome desktop symbols, then ordinary theme icons. The drawn glyph below
+    // remains available in minimal desktops and portable bundles without an icon theme.
+    static const QHash<QString, QStringList> names{
+        {"close", {"window-close-symbolic", "window-close"}},
+        {"expand", {"view-fullscreen-symbolic", "view-fullscreen"}},
+        {"copy", {"edit-copy-symbolic", "edit-copy"}},
+        {"arrow", {"go-next-symbolic", "go-next"}},
+        {"swap", {"document-swap-symbolic", "document-swap"}},
+        {"scan", {"camera-photo-symbolic", "camera-photo"}},
+        {"select", {"edit-select-symbolic", "edit-select"}},
+        {"loop", {"view-refresh-symbolic", "view-refresh"}},
+        {"settings", {"preferences-system-symbolic", "configure"}},
+        {"spark", {"accessories-dictionary-symbolic", "accessories-dictionary"}},
+        {"keyboard", {"input-keyboard-symbolic", "input-keyboard"}},
+        {"pin", {"view-pin-symbolic", "window-pin"}},
+        {"power", {"system-shutdown-symbolic", "system-shutdown"}}};
+    // Keep our language and appearance outlines: KDE can resolve even a "-symbolic"
+    // request to a colored tile whose alpha mask loses its detail when tinted.
+    for (const auto &name : names.value(glyph)) {
+        const auto icon = QIcon::fromTheme(name);
+        if (icon.isNull())
+            continue;
+        const qreal scale = p.device() ? p.device()->devicePixelRatioF() : 1;
+        // Request physical pixels explicitly: some theme engines return a low-resolution
+        // raster for the device-ratio overload. The painter already scales the destination.
+        auto pixmap = icon.pixmap((rect.size() * scale).toSize());
+        if (pixmap.isNull())
+            continue;
+        pixmap.setDevicePixelRatio(1);
+        QPainter tint(&pixmap);
+        tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        tint.fillRect(pixmap.rect(), color);
+        tint.end();
+        p.save();
+        p.setRenderHint(QPainter::SmoothPixmapTransform);
+        p.drawPixmap(rect, pixmap, QRectF(pixmap.rect()));
+        p.restore();
+        return true;
+    }
+    return false;
+}
+#endif
+
 void drawGlyph(QPainter &p, const QString &name, QRectF rect, QColor color, bool native) {
 #ifdef Q_OS_MACOS
     if (native && drawSymbol(p, name, rect, color))
+        return;
+#elif defined(Q_OS_LINUX)
+    if (native && drawDesktopSymbol(p, name, rect, color))
         return;
 #else
     Q_UNUSED(native);
@@ -646,7 +728,7 @@ QImage glyphSheet() {
                             "language", "keyboard", "appearance", "power",    "pin"};
     const QList<int> sizes{16, 20, 24, 48};
     const int cell = 60, label = 96, scale = 2;
-    const int columns = sizes.size() * (macStyle ? 2 : 1);
+    const int columns = sizes.size() * 2;
     QImage sheet((label + columns * cell) * scale, 2 * names.size() * cell * scale,
                  QImage::Format_ARGB32_Premultiplied);
     sheet.setDevicePixelRatio(scale);
@@ -685,10 +767,11 @@ void fadeIn(QWidget *widget) {
     if (current.reducedMotion || QGuiApplication::platformName() == "offscreen")
         return;
     auto *effect = new QGraphicsOpacityEffect(widget);
+    effect->setObjectName("ranslatorFade");
     widget->setGraphicsEffect(effect);
     auto *animation = new QPropertyAnimation(effect, "opacity", effect);
-    animation->setDuration(macStyle ? 220 : 180);
-    animation->setStartValue(macStyle ? 0.0 : .35);
+    animation->setDuration(220);
+    animation->setStartValue(0.0);
     animation->setEndValue(1.0);
     animation->setEasingCurve(QEasingCurve::OutCubic);
     QObject::connect(animation, &QPropertyAnimation::finished, widget,
@@ -696,6 +779,9 @@ void fadeIn(QWidget *widget) {
     animation->start();
 }
 QImage preview(QWidget *widget) {
+    // Preview a settled surface, even if a visible Wayland window or settings page just faded
+    // in. Rendering a widget with an opacity effect can otherwise produce an empty preview.
+    finishFades(widget);
     widget->ensurePolished();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
     if (widget->layout())
@@ -748,7 +834,9 @@ GlassButton::GlassButton(const QString &text, QWidget *parent) : QPushButton(tex
     hoverAnimation.setDuration(150);
     hoverAnimation.setEasingCurve(QEasingCurve::OutCubic);
     connect(&hoverAnimation, &QVariantAnimation::valueChanged, this, [this](QVariant value) {
-        hover = value.toReal();
+        hover = Design::theme().reducedMotion ? hoverAnimation.endValue().toReal() : value.toReal();
+        if (Design::theme().reducedMotion)
+            hoverAnimation.stop();
         update();
     });
     connect(this, &QPushButton::toggled, this, qOverload<>(&QWidget::update));
@@ -782,9 +870,9 @@ void GlassButton::leaveEvent(QEvent *event) {
     hoverAnimation.setEndValue(0.0);
     hoverAnimation.start();
 }
-// macOS controls: capsule buttons, accent-filled primary and selected sidebar rows, borderless
+// Shared controls: capsule buttons, accent-filled primary and selected sidebar rows, borderless
 // toolbar icons whose glyph brightens on hover, and segments that leave the thumb to the bar.
-static void paintMacButton(GlassButton *button, QPainter &p, qreal hover) {
+static void paintGlassButton(GlassButton *button, QPainter &p, qreal hover) {
     const auto &t = Design::theme();
     const bool primary = button->objectName() == "primary",
                quiet = button->property("quiet").toBool(),
@@ -812,13 +900,13 @@ static void paintMacButton(GlassButton *button, QPainter &p, qreal hover) {
         fill = t.dark ? QColor(255, 255, 255, int(hover * 20)) : QColor(0, 0, 0, int(hover * 12));
     } else {
         fill = t.dark ? QColor(255, 255, 255, 22 + int(hover * 14))
-                      : QColor(255, 255, 255, 200 + int(hover * 40));
+                      : QColor(255, 255, 255, 96 + int(hover * 40));
         edge = t.dark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 30);
     }
     p.setBrush(fill);
     p.setPen(edge.alpha() ? QPen(edge, 1) : Qt::NoPen);
     p.drawRoundedRect(r, radius, radius);
-    if (primary) {
+    if (primary && Design::macStyle) {
         // A faint top light gives the accent fill the depth of a native default button.
         QLinearGradient light(r.topLeft(), r.bottomLeft());
         light.setColorAt(0, QColor(255, 255, 255, 46));
@@ -835,7 +923,7 @@ static void paintMacButton(GlassButton *button, QPainter &p, qreal hover) {
         p.drawRoundedRect(r.adjusted(1, 1, -1, -1), radius - 1, radius - 1);
     }
     const bool onAccent = primary || (nav && selected);
-    QColor ink = onAccent ? QColor(Qt::white) : t.ink();
+    QColor ink = onAccent ? t.onAccent() : t.ink();
     if (quiet && button->text().isEmpty() && !selected) {
         // Toolbar icons stay quiet until they are hovered.
         QColor muted = t.secondary();
@@ -856,7 +944,7 @@ static void paintMacButton(GlassButton *button, QPainter &p, qreal hover) {
     qreal x = nav ? 12 : (button->width() - content) / 2.0;
     if (!glyph.isEmpty()) {
         Design::drawGlyph(p, glyph, QRectF(x, (button->height() - icon) / 2.0, icon, icon),
-                          nav && !selected ? t.accent : ink);
+                          nav && !selected && !t.highContrast ? t.secondary() : ink);
         x += icon + gap;
     }
     p.setPen(ink);
@@ -867,57 +955,7 @@ static void paintMacButton(GlassButton *button, QPainter &p, qreal hover) {
 void GlassButton::paintEvent(QPaintEvent *) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    if (Design::macStyle) {
-        paintMacButton(this, p, hover);
-        return;
-    }
-    const auto &t = Design::theme();
-    const bool primary = objectName() == "primary", quiet = property("quiet").toBool(),
-               nav = property("navigation").toBool();
-    QRectF r = QRectF(rect()).adjusted(1, 1, -1, -1);
-    if (isDown())
-        r.adjust(1.5, 1.5, -1.5, -1.5);
-    QColor ink = primary ? Qt::white : t.ink();
-    if (!isEnabled())
-        p.setOpacity(.38);
-    QLinearGradient fill(r.topLeft(), r.bottomRight());
-    if (primary) {
-        fill.setColorAt(0, QColor(isDown() ? "#3971db" : "#6297ff"));
-        fill.setColorAt(1, QColor("#3b6fe8"));
-    } else {
-        const auto alpha = quiet ? 0 : (t.dark ? 10 : 48);
-        fill.setColorAt(0, QColor(255, 255, 255, alpha + int(hover * 35) + (isChecked() ? 65 : 0)));
-        fill.setColorAt(
-            1, QColor(255, 255, 255, alpha / 2 + int(hover * 16) + (isChecked() ? 35 : 0)));
-    }
-    p.setBrush(fill);
-    p.setPen(QPen(QColor(255, 255, 255,
-                         primary  ? 85
-                         : quiet  ? int(hover * 60)
-                         : t.dark ? 26
-                                  : 145),
-                  1));
-    p.drawRoundedRect(r, nav ? 12 : r.height() / 2, nav ? 12 : r.height() / 2);
-    if (hasFocus() && window()->testAttribute(Qt::WA_KeyboardFocusChange)) {
-        p.setPen(QPen(QColor(105, 153, 255, 180), 1.5));
-        p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(r.adjusted(1, 1, -1, -1), r.height() / 2, r.height() / 2);
-    }
-    const auto glyph = property("glyph").toString();
-    const auto width = fontMetrics().horizontalAdvance(text());
-    qreal x = nav ? 14
-                  : (this->width() - width -
-                     (glyph.isEmpty()    ? 0
-                      : text().isEmpty() ? 20
-                                         : 28)) /
-                        2.0;
-    if (!glyph.isEmpty()) {
-        Design::drawGlyph(p, glyph, QRectF(x, (height() - 20) / 2.0, 20, 20), ink);
-        x += 28;
-    }
-    p.setPen(ink);
-    p.drawText(QRectF(x, 0, this->width() - x - 10, height()), Qt::AlignVCenter | Qt::AlignLeft,
-               text());
+    paintGlassButton(this, p, hover);
 }
 
 GlassSurface::GlassSurface(QWidget *parent) : QWidget(parent) {
@@ -927,7 +965,9 @@ GlassSurface::GlassSurface(QWidget *parent) : QWidget(parent) {
     thumbAnimation.setStartValue(0.0);
     thumbAnimation.setEndValue(1.0);
     connect(&thumbAnimation, &QVariantAnimation::valueChanged, this, [this](QVariant value) {
-        const qreal t = value.toReal();
+        const qreal t = Design::theme().reducedMotion ? 1 : value.toReal();
+        if (Design::theme().reducedMotion)
+            thumbAnimation.stop();
         thumb = QRectF(thumbFrom.topLeft() + (thumbTo.topLeft() - thumbFrom.topLeft()) * t,
                        thumbFrom.size() + (thumbTo.size() - thumbFrom.size()) * t);
         thumbOpacity = std::clamp(opacityFrom + (opacityTo - opacityFrom) * t, 0.0, 1.0);
@@ -981,53 +1021,38 @@ void GlassSurface::paintEvent(QPaintEvent *) {
     p.setRenderHint(QPainter::Antialiasing);
     const bool dark = Design::theme().dark;
     QRectF r = QRectF(rect()).adjusted(.7, .7, -.7, -.7);
-    if (Design::macStyle) {
-        // Bars with a large radius are capsules; cards share one concentric-looking radius.
-        const double requested = property("radius").isValid() ? property("radius").toDouble() : 0;
-        const double radius = requested >= 23 ? r.height() / 2 : 14;
-        QColor fill, edge = dark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 16);
-        if (property("overlayToolbar").toBool())
-            fill = dark ? QColor(38, 38, 42, 246) : QColor(250, 250, 252, 246);
-        else
-            fill = dark ? QColor(255, 255, 255, 12) : QColor(255, 255, 255, 150);
-        p.setBrush(fill);
-        p.setPen(QPen(edge, 1));
-        p.drawRoundedRect(r, radius, radius);
-        // At rest the thumb follows the checked segment's current geometry; only a running
-        // animation uses the interpolated rectangle.
-        // Design previews render the settled state; they do not advance animations.
-        const bool moving = thumbAnimation.state() == QAbstractAnimation::Running &&
-                            !window()->property("designPreview").toBool();
-        const QRectF at = moving ? thumb : checkedSegment();
-        const qreal opacity = moving ? thumbOpacity : (at.isEmpty() ? 0 : 1);
-        if (opacity > 0 && !at.isEmpty()) {
-            p.setOpacity(opacity);
-            const QRectF knob = at.adjusted(.5, .5, -.5, -.5);
-            const qreal round = knob.height() / 2;
-            if (!dark) {
-                // Light thumbs float on a soft shadow, like a native segmented control.
-                p.setPen(Qt::NoPen);
-                p.setBrush(QColor(0, 0, 0, 14));
-                p.drawRoundedRect(knob.translated(0, 1.2), round, round);
-            }
-            p.setBrush(dark ? QColor(255, 255, 255, 40) : QColor(255, 255, 255));
-            p.setPen(QPen(dark ? QColor(255, 255, 255, 30) : QColor(0, 0, 0, 18), .8));
-            p.drawRoundedRect(knob, round, round);
-        }
-        return;
-    }
-    const double radius = property("radius").isValid() ? property("radius").toDouble() : 22;
-    QLinearGradient fill(r.topLeft(), r.bottomRight());
-    if (property("overlayToolbar").toBool()) {
-        fill.setColorAt(0, dark ? QColor(30, 42, 62, 245) : QColor(245, 250, 255, 245));
-        fill.setColorAt(1, dark ? QColor(23, 32, 48, 240) : QColor(229, 239, 253, 240));
-    } else {
-        fill.setColorAt(0, QColor(255, 255, 255, dark ? 8 : 125));
-        fill.setColorAt(1, QColor(255, 255, 255, dark ? 5 : 48));
-    }
+    // Bars with a large radius are capsules; cards share one concentric-looking radius.
+    const double requested = property("radius").isValid() ? property("radius").toDouble() : 0;
+    const double radius = requested >= 23 ? r.height() / 2 : 14;
+    QColor fill, edge = dark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 16);
+    if (property("overlayToolbar").toBool())
+        fill = dark ? QColor(38, 38, 42, 246) : QColor(250, 250, 252, 246);
+    else
+        fill = dark ? QColor(255, 255, 255, 12) : QColor(255, 255, 255, 48);
     p.setBrush(fill);
-    p.setPen(QPen(QColor(255, 255, 255, dark ? 35 : 205), 1));
+    p.setPen(QPen(edge, 1));
     p.drawRoundedRect(r, radius, radius);
+    // At rest the thumb follows the checked segment's current geometry; only a running
+    // animation uses the interpolated rectangle.
+    // Design previews render the settled state; they do not advance animations.
+    const bool moving = thumbAnimation.state() == QAbstractAnimation::Running &&
+                        !window()->property("designPreview").toBool();
+    const QRectF at = moving ? thumb : checkedSegment();
+    const qreal opacity = moving ? thumbOpacity : (at.isEmpty() ? 0 : 1);
+    if (opacity > 0 && !at.isEmpty()) {
+        p.setOpacity(opacity);
+        const QRectF knob = at.adjusted(.5, .5, -.5, -.5);
+        const qreal round = knob.height() / 2;
+        if (!dark) {
+            // Light thumbs float on a soft shadow, like a native segmented control.
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(0, 0, 0, 14));
+            p.drawRoundedRect(knob.translated(0, 1.2), round, round);
+        }
+        p.setBrush(dark ? QColor(255, 255, 255, 40) : QColor(255, 255, 255));
+        p.setPen(QPen(dark ? QColor(255, 255, 255, 30) : QColor(0, 0, 0, 18), .8));
+        p.drawRoundedRect(knob, round, round);
+    }
 }
 
 static void initializeWindow(QWidget *w) {
@@ -1049,6 +1074,8 @@ static void showMaterial(QWidget *w) {
         appear->setEasingCurve(QEasingCurve::OutCubic);
         appear->start(QAbstractAnimation::DeleteWhenStopped);
     }
+    // Let the Linux compositor animate the live translucent surface. An offscreen opacity
+    // effect on the whole window caches its painting and competes with compositor effects.
 }
 static void moveMaterial(QWidget *w, QMouseEvent *e) {
     if (e->button() != Qt::LeftButton || !w->windowHandle())

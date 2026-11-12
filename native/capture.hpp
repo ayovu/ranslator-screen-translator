@@ -8,6 +8,8 @@ QScreen *fallbackScreen();
 // Resolve before hiding any windows. QCursor::pos() is not a global cursor query on Wayland.
 void invocationScreen(QObject *owner, std::function<void(QScreen *)> done);
 QScreen *imageScreen(const QImage &image, QScreen *invocation, bool useMetadata);
+// Pixel crops for a desktop image composed in logical output coordinates, at any DPR.
+QList<QRect> desktopCrops(QSize pixels, const QList<QRect> &outputs);
 void showOnScreen(QWidget *widget, QScreen *screen, bool fullscreen);
 bool directCaptureAvailable();
 QStringList spectacleArguments(const QString &mode, const QString &path);

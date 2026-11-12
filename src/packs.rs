@@ -42,18 +42,24 @@ pub fn directory() -> PathBuf {
     base.join("ranslator/tessdata")
 }
 pub fn list(config: &Config) -> serde_json::Value {
-    serde_json::Value::Array(
-        catalog()
-            .packs
-            .iter()
-            .map(|pack| {
-                let mut item = serde_json::to_value(pack).expect("Pack serialization");
-                item["installed"] =
-                    serde_json::json!(ocr::model_path(config, &pack.code).is_some());
-                item
-            })
-            .collect(),
-    )
+    let mut installed = ocr::installed_models(config);
+    let mut packs: Vec<_> = catalog()
+        .packs
+        .iter()
+        .map(|pack| {
+            let mut item = serde_json::to_value(pack).expect("Pack serialization");
+            let path = installed.remove(&pack.code);
+            item["installed"] = serde_json::json!(path.is_some());
+            item["path"] = serde_json::json!(path);
+            item["downloadable"] = serde_json::json!(true);
+            item
+        })
+        .collect();
+    packs.extend(installed.into_iter().map(|(code, path)| {
+        serde_json::json!({"code":code, "name":code, "installed":true,
+            "downloadable":false, "bytes":0, "path":path})
+    }));
+    serde_json::Value::Array(packs)
 }
 pub fn verify(pack: &Pack, bytes: &[u8]) -> Result<()> {
     if bytes.len() as u64 != pack.bytes || format!("{:x}", Sha256::digest(bytes)) != pack.sha256 {

@@ -1,5 +1,6 @@
 #include "../native/ui.cpp"
 #include <QAccessible>
+#include <QScopeGuard>
 #include <QTranslator>
 #include <QtTest>
 
@@ -284,9 +285,8 @@ class UiTests : public QObject {
         QWidget otherWindow;
         otherWindow.show();
         QVERIFY(QTest::qWaitForWindowExposed(&otherWindow));
-        QCOMPARE(QProcess::execute("xdotool",
-                                   {"windowfocus", QString::number(otherWindow.winId())}),
-                 0);
+        QCOMPARE(
+            QProcess::execute("xdotool", {"windowfocus", QString::number(otherWindow.winId())}), 0);
         QTRY_VERIFY(!field->isRecording());
         QCOMPARE(field->sequence(), QString("Ctrl+Alt+O"));
     }
@@ -361,6 +361,117 @@ class UiTests : public QObject {
         }
         Design::configure(defaults());
     }
+    void glass_is_opaque_without_blur_or_when_transparency_is_reduced() {
+        const auto restore = qScopeGuard([] { Design::configure(defaults()); });
+        auto config = defaults();
+        config["appearance"] = "light";
+        config["reduce_transparency"] = false;
+        config["reduce_motion"] = true;
+        Design::configure(config);
+        GlassWindow window;
+        window.resize(360, 260);
+        window.show();
+        QCoreApplication::processEvents();
+        const auto alpha = [&] {
+            const auto image = window.grab().toImage();
+            return image.pixelColor(QPoint(180, 130) * image.devicePixelRatio()).alpha();
+        };
+        window.setProperty("desktopBlur", false);
+        QCOMPARE(alpha(), 255);
+        window.setProperty("desktopBlur", true);
+        QVERIFY(alpha() < 255);
+        config["reduce_transparency"] = true;
+        Design::configure(config);
+        window.setProperty("desktopBlur", true);
+        QCOMPARE(alpha(), 255);
+    }
+    void design_preview_draws_the_complete_window_during_an_active_fade() {
+        GlassWindow window;
+        window.resize(300, 160);
+        auto *caption = new QLabel("Synthetic preview", &window);
+        caption->setGeometry(40, 60, 220, 40);
+        window.show();
+        const auto expected = Design::preview(&window);
+        for (auto *widget : {static_cast<QWidget *>(&window), static_cast<QWidget *>(caption)}) {
+            auto *effect = new QGraphicsOpacityEffect(widget);
+            effect->setObjectName("ranslatorFade");
+            effect->setOpacity(0);
+            widget->setGraphicsEffect(effect);
+        }
+        QCOMPARE(Design::preview(&window), expected);
+        QVERIFY(!window.graphicsEffect());
+        QVERIFY(!caption->graphicsEffect());
+    }
+    void segmented_control_follows_the_active_button_and_respects_reduced_motion() {
+        const auto restore = qScopeGuard([] { Design::configure(defaults()); });
+        auto config = defaults();
+        config["appearance"] = "light";
+        config["reduce_motion"] = true;
+        Design::configure(config);
+        GlassSurface bar;
+        bar.setProperty("radius", 25);
+        auto *layout = new QHBoxLayout(&bar);
+        GlassButton first, second;
+        for (auto *button : {&first, &second}) {
+            button->setCheckable(true);
+            button->setProperty("quiet", true);
+            layout->addWidget(button);
+        }
+        bar.setSegments({&first, &second});
+        first.setChecked(true);
+        bar.resize(320, 64);
+        bar.show();
+        QCoreApplication::processEvents();
+        const auto highlighted = [&](GlassButton &button) {
+            const auto image = bar.grab().toImage();
+            return image.pixelColor(button.geometry().center() * image.devicePixelRatio()).alpha();
+        };
+        QCOMPARE(highlighted(first), 255);
+        QVERIFY(highlighted(second) < 255);
+        config["reduce_motion"] = false;
+        Design::configure(config);
+        first.setChecked(false);
+        second.setChecked(true);
+        QTest::qWait(40);
+        config["reduce_motion"] = true;
+        Design::configure(config);
+        QTest::qWait(30);
+        QCOMPARE(highlighted(second), 255);
+        QVERIFY(highlighted(first) < 255);
+        bar.hide();
+        first.setChecked(true);
+        second.setChecked(false);
+        bar.resize(480, 64);
+        bar.show();
+        QCoreApplication::processEvents();
+        QCOMPARE(highlighted(first), 255);
+        QVERIFY(highlighted(second) < 255);
+    }
+#ifndef Q_OS_MACOS
+    void a_desktop_accent_change_updates_existing_controls_without_a_theme_switch() {
+        const auto original = qApp->palette();
+        const auto restore = qScopeGuard([original] {
+            qApp->setPalette(original);
+            Design::configure(defaults());
+        });
+        auto config = defaults();
+        config["appearance"] = "light";
+        Design::configure(config);
+        for (const auto &color : {QColor("#ffed33"), QColor("#153060")}) {
+            auto palette = original;
+            palette.setColor(QPalette::Highlight, color);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+            palette.setColor(QPalette::Accent, color);
+#endif
+            qApp->setPalette(palette);
+            QTRY_COMPARE(Design::theme().accent, color);
+            QVERIFY(qApp->styleSheet().contains("selection-background-color: " + color.name()));
+            QCOMPARE(Design::theme().onAccent(),
+                     color.lightness() > 128 ? QColor(Qt::black) : QColor(Qt::white));
+            QVERIFY(!Design::theme().dark);
+        }
+    }
+#endif
     void desktop_palette_updates_keep_reopened_translator_transparent() {
         auto config = defaults();
         config["appearance"] = "dark";
@@ -469,6 +580,7 @@ class UiTests : public QObject {
         Design::configure(defaults());
     }
     void dark_material_stays_dark_over_a_white_background() {
+        const auto restore = qScopeGuard([] { Design::configure(defaults()); });
         GlassWindow window;
         window.resize(360, 260);
         window.show();
@@ -632,6 +744,413 @@ class UiTests : public QObject {
         QCOMPARE(model->currentText(), "qwen2.5:3b");
         dialog->close();
     }
+    void installed_ocr_picker_filters_refreshes_and_preserves_language_priority() {
+        auto config = defaults();
+        config["ocr_engine"] = "tesseract";
+        config["ocr_languages"] = "rus+eng";
+        Window window(config, true);
+        named(&window, "Open settings")->click();
+        auto *settings = window.findChild<QDialog *>();
+        named(settings, "Screen text")->click();
+        named(settings, "Choose installed languages…")->click();
+        auto *picker = settings->findChild<QDialog *>();
+        QVERIFY(picker);
+        const auto id = sent["id"];
+        QJsonArray catalog;
+        for (const auto &code : {"eng", "rus", "ukr", "private_model", "fra"})
+            catalog.append(QJsonObject{{"code", code},
+                                       {"name", code},
+                                       {"installed", QString(code) != "fra"},
+                                       {"downloadable", QString(code) != "private_model"},
+                                       {"bytes", 1000}});
+        window.receive({{"type", "packs_list"}, {"id", id}, {"packs", catalog}});
+        auto checks = picker->findChild<QScrollArea *>("ocrModelList")->findChildren<QCheckBox *>();
+        QCOMPARE(checks.size(), 5);
+        QVERIFY(picker->findChild<QCheckBox *>("ocrInstalledOnly")->isChecked());
+        QVERIFY(checks[4]->isHidden());
+        QVERIFY(checks[0]->isChecked());
+        QVERIFY(checks[1]->isChecked());
+        auto *search = picker->findChild<QLineEdit *>("ocrLanguageSearch");
+        search->setText("ukr");
+        QVERIFY(checks[0]->isHidden());
+        QVERIFY(!checks[2]->isHidden());
+        checks[2]->setChecked(true);
+        search->clear();
+        checks[3]->setChecked(true);
+        named(picker, "Refresh installed models")->click();
+        QCOMPARE(sent["type"].toString(), "list_packs");
+        window.receive({{"type", "packs_list"}, {"id", id}, {"packs", catalog}});
+        messages.clear();
+        named(picker, "Use selected")->click();
+        QCOMPARE(settings->findChild<QLineEdit *>("ocrLanguages")->text(),
+                 "rus+eng+ukr+private_model");
+        for (const auto &message : messages)
+            QVERIFY(message["type"] != "install_packs");
+        named(settings, "Save")->click();
+        QCOMPARE(sent["config"].toObject()["ocr_languages"].toString(),
+                 "rus+eng+ukr+private_model");
+        settings->close();
+    }
+    void installed_ocr_picker_selects_all_and_preserves_missing_preferences_on_cancel() {
+        auto config = defaults();
+        config["ocr_engine"] = "tesseract";
+        config["ocr_languages"] = "missing_custom";
+        Window window(config, true);
+        named(&window, "Open settings")->click();
+        auto *settings = window.findChild<QDialog *>();
+        named(settings, "Screen text")->click();
+        named(settings, "Choose installed languages…")->click();
+        auto *picker = settings->findChild<QDialog *>();
+        QJsonArray catalog;
+        for (int i = 0; i < 25; ++i)
+            catalog.append(QJsonObject{{"code", QString("lang%1").arg(i)},
+                                       {"name", QString("Language %1").arg(i)},
+                                       {"installed", true}});
+        window.receive({{"type", "packs_list"}, {"id", sent["id"]}, {"packs", catalog}});
+        auto checks = picker->findChild<QScrollArea *>("ocrModelList")->findChildren<QCheckBox *>();
+        QCOMPARE(checks.size(), 26);
+        QVERIFY(checks.last()->isChecked());
+        QVERIFY(!named(picker, "Use selected")->isEnabled());
+        checks.last()->setChecked(false);
+        auto *all = named(picker, "Select all");
+        QVERIFY(all && !all->isHidden());
+        all->click();
+        for (int i = 0; i < 25; ++i)
+            QVERIFY(checks[i]->isChecked());
+        QVERIFY(!checks.last()->isChecked());
+        QVERIFY(named(picker, "Use selected")->isEnabled());
+        picker->reject();
+        QCOMPARE(settings->findChild<QLineEdit *>("ocrLanguages")->text(), "missing_custom");
+        settings->close();
+    }
+    void installed_ocr_select_all_saves_all_models_and_respects_search() {
+        auto config = defaults();
+        config["ocr_engine"] = "tesseract";
+        config["ocr_languages"] = "lang2+lang1";
+        Window window(config, true);
+        named(&window, "Open settings")->click();
+        auto *settings = window.findChild<QDialog *>();
+        named(settings, "Screen text")->click();
+        named(settings, "Choose installed languages…")->click();
+        auto *picker = settings->findChild<QDialog *>();
+        QJsonArray catalog;
+        for (int i = 0; i < 26; ++i)
+            catalog.append(QJsonObject{{"code", QString("lang%1").arg(i)},
+                                       {"name", QString("Language %1").arg(i)},
+                                       {"installed", i < 25},
+                                       {"bytes", 1000}});
+        window.receive({{"type", "packs_list"}, {"id", sent["id"]}, {"packs", catalog}});
+        auto checks = picker->findChild<QScrollArea *>("ocrModelList")->findChildren<QCheckBox *>();
+        auto *search = picker->findChild<QLineEdit *>("ocrLanguageSearch");
+        search->setText("lang24");
+        named(picker, "Select all")->click();
+        QCOMPARE(
+            std::count_if(checks.begin(), checks.end(), [](auto *c) { return c->isChecked(); }), 3);
+        search->clear();
+        named(picker, "Select all")->click();
+        QVERIFY(!checks.last()->isChecked());
+        messages.clear();
+        named(picker, "Use selected")->click();
+        named(settings, "Save")->click();
+        const auto selected = sent["config"].toObject()["ocr_languages"].toString().split('+');
+        QCOMPARE(selected.size(), 25);
+        QCOMPARE(selected.first(), "lang2");
+        QCOMPARE(selected[1], "lang1");
+        for (const auto &message : messages)
+            QVERIFY(message["type"] != "install_packs");
+        settings->close();
+    }
+    void snapshot_outlines_are_visible_away_from_the_pointer() {
+        QImage image(800, 600, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        auto *view = new SnapshotView(image, false, {});
+        QTest::qWait(20);
+        QTest::mouseMove(view, QPoint(4, 4));
+        const auto before = view->grab().toImage();
+        view->setWords({QJsonObject{{"x", 250},
+                                    {"y", 400},
+                                    {"width", 100},
+                                    {"height", 30},
+                                    {"line", "1"},
+                                    {"text", "Selectable"}}});
+        const auto after = view->grab().toImage();
+        const double scale = qMin(view->width() / 800.0, view->height() / 600.0);
+        const QPoint origin((view->width() - 800 * scale) / 2, (view->height() - 600 * scale) / 2);
+        const auto dpr = after.devicePixelRatio();
+        const QRect region((origin + QPoint(245 * scale, 395 * scale)) * dpr,
+                           QSize(110 * scale * dpr, 40 * scale * dpr));
+        int changed = 0;
+        for (int y = region.top(); y <= region.bottom(); ++y)
+            for (int x = region.left(); x <= region.right(); ++x)
+                changed += before.pixel(x, y) != after.pixel(x, y);
+        QVERIFY2(changed > 100,
+                 "Recognized text needs a visible outline even without pointer hover");
+        view->close();
+    }
+    void snapshot_keep_open_applies_to_another_output_before_ocr_finishes() {
+        auto session = std::make_shared<SnapshotSession>();
+        QImage image(800, 600, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        bool replacedFullScreenOcr = false;
+        auto *first = new SnapshotView(image, false, {}, nullptr, session);
+        auto *second = new SnapshotView(
+            image, false, [&](QImage, QPoint) { replacedFullScreenOcr = true; }, nullptr, session);
+        first->setWords({QJsonObject{{"x", 100},
+                                     {"y", 300},
+                                     {"width", 100},
+                                     {"height", 30},
+                                     {"line", "1"},
+                                     {"text", "First"}}});
+        QTest::keyClick(first, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(first, Qt::Key_Return, Qt::ShiftModifier);
+        QTest::keyRelease(first, Qt::Key_Shift);
+        QTest::keyRelease(first, Qt::Key_Control);
+        QCOMPARE(sent["type"].toString(), "snapshot_request");
+        QTest::mousePress(second, Qt::LeftButton, Qt::NoModifier, QPoint(200, 300));
+        QTest::mouseMove(second, QPoint(350, 340));
+        QTest::mouseRelease(second, Qt::LeftButton, Qt::NoModifier, QPoint(350, 340));
+        QVERIFY(!replacedFullScreenOcr);
+        QCOMPARE(sent["type"].toString(), "snapshot_request");
+        QCOMPARE(sent["session"].toString(), session->id);
+        QVERIFY(!sent["path"].toString().isEmpty());
+        QVERIFY(first->isVisible() && second->isVisible());
+        first->close();
+        second->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+    void desktop_snapshot_opens_one_view_per_output_and_routes_results() {
+        if (qEnvironmentVariable("RANSLATOR_TEST_DESKTOP_LAYOUT") != "1")
+            QSKIP("Run on a private compositor with two synthetic outputs");
+        const auto screens = QGuiApplication::screens();
+        QVERIFY(screens.size() >= 2);
+        QTemporaryDir temporary;
+        const auto imagePath = temporary.filePath("desktop.png");
+        QRect bounds;
+        for (auto *screen : screens)
+            bounds |= screen->geometry();
+        QImage image(bounds.size() * 2, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        QPainter painter(&image);
+        QFont fixtureFont("DejaVu Sans");
+        fixtureFont.setPixelSize(72);
+        painter.setFont(fixtureFont);
+        int index = 0;
+        for (auto *screen : screens) {
+            const auto rectangle = screen->geometry().translated(-bounds.topLeft());
+            painter.fillRect(QRect(rectangle.topLeft() * 2, rectangle.size() * 2),
+                             index % 2 ? QColor("#c4e4ff") : QColor("#ffe4c4"));
+            painter.setPen(Qt::black);
+            painter.drawText(rectangle.topLeft() * 2 + QPoint(120, 550),
+                             index++ == 0 ? "Alpha" : "Beta");
+        }
+        painter.end();
+        QVERIFY(image.save(imagePath));
+        QFile script(temporary.filePath("spectacle"));
+        QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write(
+            "#!/bin/sh\nwhile [ \"$#\" -gt 0 ]; do if [ \"$1\" = --output ]; then shift; exec cp "
+            "-- \"$RANSLATOR_TEST_DESKTOP_IMAGE\" \"$1\"; fi; shift; done\nexit 1\n");
+        script.close();
+        QVERIFY(script.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        const auto oldPath = qgetenv("PATH"), oldDesktop = qgetenv("XDG_CURRENT_DESKTOP");
+        qputenv("PATH", temporary.path().toUtf8() + ":" + oldPath);
+        qputenv("XDG_CURRENT_DESKTOP", "KDE");
+        qputenv("RANSLATOR_TEST_DESKTOP_IMAGE", imagePath.toUtf8());
+        const auto restore = qScopeGuard([=] {
+            qputenv("PATH", oldPath);
+            qputenv("XDG_CURRENT_DESKTOP", oldDesktop);
+            qunsetenv("RANSLATOR_TEST_DESKTOP_IMAGE");
+        });
+        auto config = defaults();
+        config["capture_mode"] = "desktop";
+        Window window(config, true);
+        messages.clear();
+        window.receive({{"type", "capture"}});
+        QTRY_COMPARE_WITH_TIMEOUT(sent["type"].toString(), QString("ocr"), 8000);
+        QList<SnapshotView *> views;
+        for (auto *widget : QApplication::topLevelWidgets())
+            if (auto *view = dynamic_cast<SnapshotView *>(widget); view && view->isVisible())
+                views.append(view);
+        QCOMPARE(views.size(), screens.size());
+        QJsonArray words;
+        index = 0;
+        for (auto *screen : screens) {
+            const auto origin = (screen->geometry().topLeft() - bounds.topLeft()) * 2;
+            words.append(QJsonObject{{"x", origin.x() + 100},
+                                     {"y", origin.y() + 100},
+                                     {"width", 100},
+                                     {"height", 30},
+                                     {"line", "1"},
+                                     {"text", index++ == 0 ? "Alpha" : "Beta"}});
+        }
+        const auto binary = qEnvironmentVariable("RANSLATOR_TEST_OCR_BINARY");
+        if (!binary.isEmpty()) {
+            const auto profilePath = temporary.filePath("ocr.json");
+            QFile profile(profilePath);
+            QVERIFY(profile.open(QIODevice::WriteOnly));
+            config["ocr_languages"] = "eng";
+            config["ocr_engine"] = "tesseract";
+            profile.write(QJsonDocument(config).toJson());
+            profile.close();
+            QProcess recognizer;
+            auto environment = QProcessEnvironment::systemEnvironment();
+            environment.insert("RANSLATOR_CONFIG", profilePath);
+            recognizer.setProcessEnvironment(environment);
+            recognizer.start(binary, {"--ocr", imagePath});
+            QVERIFY(recognizer.waitForFinished(30000));
+            QVERIFY2(recognizer.exitCode() == 0, recognizer.readAllStandardError().constData());
+            words = QJsonDocument::fromJson(recognizer.readAllStandardOutput()).array();
+            QVERIFY(words.size() >= 2);
+        }
+        window.receive({{"type", "ocr"}, {"path", sent["path"]}, {"words", words}});
+        QString session;
+        QSet<int> ids;
+        for (auto *view : views) {
+            QVERIFY(QTest::qWaitForWindowExposed(view));
+            QCOMPARE(view->size(), view->screen()->size());
+            QCOMPARE(view->windowHandle()->visibility(), QWindow::FullScreen);
+            const auto text =
+                screens.indexOf(view->screen()) == 0 ? QString("Alpha") : QString("Beta");
+            QCOMPARE(view->accessibleDescription(), text);
+            QTest::keyClick(view, Qt::Key_A, Qt::ControlModifier);
+            QTest::keyClick(view, Qt::Key_Return,
+                            session.isEmpty() ? Qt::ShiftModifier : Qt::NoModifier);
+            QCOMPARE(sent["type"].toString(), "snapshot_request");
+            QCOMPARE(sent["text"].toString(), text);
+            QVERIFY(!ids.contains(sent["id"].toInt()));
+            ids.insert(sent["id"].toInt());
+            if (session.isEmpty())
+                session = sent["session"].toString();
+            QCOMPARE(sent["session"].toString(), session);
+            auto result = sent;
+            result["type"] = "snapshot_region";
+            result["phase"] = "translation";
+            result["text"] = "Translated " + text;
+            window.receive(result);
+            auto *editor = view->findChild<QPlainTextEdit *>();
+            QVERIFY(editor);
+            QCOMPARE(editor->toPlainText(), "Translated " + text);
+        }
+        views.first()->close();
+        for (auto *view : views)
+            QVERIFY(!view->isVisible());
+        QCOMPARE(sent["type"].toString(), "snapshot_end");
+    }
+    void material_probe_on_isolated_compositor() {
+        const auto directory = qEnvironmentVariable("RANSLATOR_MATERIAL_PROBE_DIR");
+        if (directory.isEmpty())
+            QSKIP("Synthetic compositor fixture; run only on an isolated display");
+        class Backdrop final : public QWidget {
+          public:
+            QColor color;
+            void paintEvent(QPaintEvent *) override {
+                QPainter p(this);
+                p.fillRect(rect(), color);
+                for (int x = 0; x < width(); x += 8)
+                    p.fillRect(x, 0, 4, height(), QColor(255, 255, 255, 75));
+            }
+        } background;
+        background.color = QColor("#dc3020");
+        background.showFullScreen();
+        QVERIFY(QTest::qWaitForWindowExposed(&background));
+        GlassWindow foreground;
+        foreground.setWindowTitle("Synthetic Ranslator material probe");
+        foreground.resize(600, 440);
+        foreground.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&foreground));
+        for (int stage = 0; stage < 4; ++stage) {
+            auto config = defaults();
+            config["appearance"] = stage < 2 ? "dark" : "light";
+            Design::configure(config);
+            background.color = stage % 2 ? QColor("#2040dc") : QColor("#dc3020");
+            background.update();
+            QTest::qWait(1200);
+            foreground.grab().save(directory + QString("/surface-%1.png").arg(stage));
+            QFile ready(directory + QString("/ready-%1").arg(stage));
+            QVERIFY(ready.open(QIODevice::WriteOnly));
+            ready.close();
+            QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(directory + QString("/ack-%1").arg(stage)),
+                                     15000);
+        }
+        foreground.close();
+        auto config = defaults();
+        config["appearance"] = "light";
+        config["ocr_engine"] = "tesseract";
+        config["ocr_languages"] = "eng+rus+ukr";
+        Design::configure(config);
+        background.color = QColor("#708997");
+        background.update();
+        Window window(config, true);
+        named(&window, "Open settings")->click();
+        auto *settings = window.findChild<QDialog *>();
+        named(settings, "Appearance")->click();
+        for (int stage = 4; stage < 6; ++stage) {
+            if (stage == 5) {
+                named(settings, "Screen text")->click();
+                named(settings, "Choose installed languages…")->click();
+                QFile catalog(QString(RANSLATOR_SOURCE_DIR) + "/assets/ocr-packs.json");
+                QVERIFY(catalog.open(QIODevice::ReadOnly));
+                QJsonArray installed;
+                for (const auto &entry :
+                     QJsonDocument::fromJson(catalog.readAll()).object()["packs"].toArray()) {
+                    auto pack = entry.toObject();
+                    pack["installed"] = true;
+                    installed.append(pack);
+                }
+                window.receive({{"type", "packs_list"}, {"id", sent["id"]}, {"packs", installed}});
+            }
+            QTest::qWait(800);
+            QFile ready(directory + QString("/ready-%1").arg(stage));
+            QVERIFY(ready.open(QIODevice::WriteOnly));
+            ready.close();
+            QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(directory + QString("/ack-%1").arg(stage)),
+                                     15000);
+        }
+        settings->close();
+        background.close();
+        Design::configure(defaults());
+    }
+    void desktop_crops_preserve_offsets_gaps_and_fractional_scale() {
+        const QList<QRect> layout{QRect(-1920, 200, 1920, 1080), QRect(0, 0, 2560, 1440)};
+        const auto crops = Capture::desktopCrops(QSize(6720, 2160), layout);
+        QCOMPARE(crops, (QList<QRect>{QRect(0, 300, 2880, 1620), QRect(2880, 0, 3840, 2160)}));
+        QVERIFY(Capture::desktopCrops(QSize(1920, 1080), layout).isEmpty());
+        QVERIFY(Capture::desktopCrops({}, layout).isEmpty());
+    }
+    void snapshot_views_share_a_session_without_reusing_region_requests() {
+        auto session = std::make_shared<SnapshotSession>();
+        QImage image(800, 600, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        messages.clear();
+        auto *first = new SnapshotView(image, false, {}, nullptr, session);
+        auto *second = new SnapshotView(image, false, {}, nullptr, session);
+        QJsonArray words{QJsonObject{{"x", 100},
+                                     {"y", 100},
+                                     {"width", 100},
+                                     {"height", 20},
+                                     {"line", "1"},
+                                     {"text", "Synthetic"}}};
+        QJsonObject requests[2];
+        int index = 0;
+        for (auto *view : {first, second}) {
+            view->setWords(words, {});
+            QTest::keyClick(view, Qt::Key_A, Qt::ControlModifier);
+            QTest::keyClick(view, Qt::Key_Return, index == 0 ? Qt::ShiftModifier : Qt::NoModifier);
+            QCOMPARE(sent["type"].toString(), "snapshot_request");
+            requests[index++] = sent;
+            // Creating a card changes focus during keyPress; explicitly release modifiers
+            // so Qt's offscreen keyboard state does not leak into the next test.
+            QTest::keyRelease(view, Qt::Key_Shift);
+            QTest::keyRelease(view, Qt::Key_Control);
+        }
+        QCOMPARE(requests[0]["session"].toString(), session->id);
+        QCOMPARE(requests[1]["session"].toString(), session->id);
+        QVERIFY(requests[0]["id"] != requests[1]["id"]);
+        first->close();
+        second->close();
+        for (const auto &message : messages)
+            QVERIFY(message["type"] != "snapshot_start" && message["type"] != "snapshot_end");
+    }
     void packs_can_download_the_entire_catalog() {
         // Language packs belong to Tesseract; macOS defaults to Apple Vision, which needs none.
         auto config = defaults();
@@ -652,7 +1171,8 @@ class UiTests : public QObject {
                                        {"installed", false}});
         window.receive({{"type", "packs_list"}, {"id", id}, {"packs", catalog}});
         named(packs, "Select all")->click();
-        for (auto *check : packs->findChildren<QCheckBox *>())
+        for (auto *check :
+             packs->findChild<QScrollArea *>("ocrModelList")->findChildren<QCheckBox *>())
             QVERIFY(check->isChecked());
         named(packs, "Download all packs")->click();
         QCOMPARE(sent["type"].toString(), "install_packs");
@@ -705,7 +1225,8 @@ class UiTests : public QObject {
     }
     void translate_selection_comes_first_can_be_turned_off_and_needs_its_own_chord() {
         Window window(defaults(), true);
-        QVERIFY(window.findChild<QLabel *>("status")->text().contains(shortcutLabel("Alt+Shift+C")));
+        QVERIFY(
+            window.findChild<QLabel *>("status")->text().contains(shortcutLabel("Alt+Shift+C")));
         named(&window, "Open settings")->click();
         auto *dialog = window.findChild<QDialog *>();
         named(dialog, "Shortcuts")->click();

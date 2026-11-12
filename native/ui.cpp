@@ -442,6 +442,14 @@ class SnapshotCard : public GlassSurface {
     }
 };
 
+class SnapshotView;
+struct SnapshotSession {
+    QString id = QUuid::createUuid().toString(QUuid::Id128);
+    int nextCard = 0, nextRequest = 0;
+    bool multiple = false;
+    QList<QPointer<SnapshotView>> views;
+};
+
 class SnapshotView : public QWidget {
     QImage image;
     QJsonArray words;
@@ -467,10 +475,12 @@ class SnapshotView : public QWidget {
         int requestId = 0;
     };
     QMap<int, Region> regions;
-    QString session = QUuid::createUuid().toString(QUuid::Id128);
+    std::shared_ptr<SnapshotSession> sharedSession;
+    QString session;
+    bool ownsSession;
     QTemporaryDir regionShots;
-    bool multiple = false, keepSelection = false;
-    int nextCard = 0, nextRequest = 0, activeCard = 0;
+    bool keepSelection = false;
+    int activeCard = 0;
     QWidget *toolbar = nullptr;
     QRectF mapImageRect(const QRectF &raw) const {
         const auto area = imageRect();
@@ -489,9 +499,10 @@ class SnapshotView : public QWidget {
     }
     void updateHint() {
         hint->setText(
-            multiple ? UiText::tr("Select more text · Drag cards · Esc to leave")
-                     : UiText::tr(
-                           "Select text · Hold Shift or Ctrl to keep the snapshot · Esc to leave"));
+            sharedSession->multiple
+                ? UiText::tr("Select more text · Drag cards · Esc to leave")
+                : UiText::tr(
+                      "Select text · Hold Shift or Ctrl to keep the snapshot · Esc to leave"));
     }
     QPoint boundedPosition(QPoint point, QSize size) const {
         const int top = toolbar ? toolbar->geometry().bottom() + 12 : 90;
@@ -529,7 +540,7 @@ class SnapshotView : public QWidget {
             send({{"type", "snapshot_cancel_region"},
                   {"session", session},
                   {"id", region.requestId}});
-        region.requestId = ++nextRequest;
+        region.requestId = ++sharedSession->nextRequest;
         region.request["type"] = "snapshot_request";
         region.request["session"] = session;
         region.request["id"] = region.requestId;
@@ -539,11 +550,13 @@ class SnapshotView : public QWidget {
         send(region.request);
     }
     void addRegion(QString text, QJsonArray boxes, QRectF bounds, QJsonObject request = {}) {
-        multiple = true;
-        updateHint();
+        sharedSession->multiple = true;
+        for (auto view : sharedSession->views)
+            if (view)
+                view->updateHint();
         static const QColor colors[] = {QColor("#477edb"), QColor("#ad59be"), QColor("#258b80"),
                                         QColor("#bf7c2f"), QColor("#ce597a"), QColor("#6474bd")};
-        const int id = ++nextCard;
+        const int id = ++sharedSession->nextCard;
         auto color = colors[(id - 1) % 6];
         auto *card = new SnapshotCard(this, id, color);
         request["text"] = text;
@@ -656,6 +669,8 @@ class SnapshotView : public QWidget {
         }
     }
     void finish() {
+        if (activated)
+            activated();
         QString text, line;
         QJsonArray boxes;
         QRectF bounds;
@@ -672,7 +687,7 @@ class SnapshotView : public QWidget {
             }
         if (text.isEmpty())
             return;
-        if (multiple || keepSelection) {
+        if (sharedSession->multiple || keepSelection) {
             addRegion(text, boxes, bounds);
             return;
         }
@@ -736,7 +751,10 @@ class SnapshotView : public QWidget {
 
   protected:
     void closeEvent(QCloseEvent *event) override {
-        send({{"type", "snapshot_end"}, {"session", session}});
+        if (ownsSession)
+            send({{"type", "snapshot_end"}, {"session", session}});
+        if (closed)
+            closed();
         QWidget::closeEvent(event);
     }
     void resizeEvent(QResizeEvent *event) override {
@@ -765,10 +783,16 @@ class SnapshotView : public QWidget {
         p.fillRect(QRectF(hover - QPointF(72, 72), QSizeF(144, 144)), halo);
         for (int i = 0; i < words.size(); ++i) {
             QRectF r = wordRect(i).adjusted(-2, -1, 2, 1);
-            if (!chosen.contains(i) && !r.adjusted(-35, -35, 35, 35).contains(hover))
-                continue;
+            const bool selected = chosen.contains(i);
+            const bool nearby = r.adjusted(-35, -35, 35, 35).contains(hover);
+            // Show every selectable word on every output, including before the pointer enters
+            // that window. A dark outer edge keeps the outline visible over light screenshots.
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(QColor(10, 25, 45, 110), selected || nearby ? 3 : 2.5));
+            p.drawRoundedRect(r, 2, 2);
             p.setPen(
-                QPen(chosen.contains(i) ? QColor(106, 175, 255) : QColor(255, 255, 255, 100), 1));
+                QPen(selected ? QColor(106, 175, 255) : QColor(155, 205, 255, nearby ? 240 : 165),
+                     selected || nearby ? 1.5 : 1));
             p.setBrush(chosen.contains(i) ? QColor(50, 130, 255, 100) : Qt::transparent);
             p.drawRoundedRect(r, 2, 2);
         }
@@ -784,6 +808,8 @@ class SnapshotView : public QWidget {
             paintRegion(p, activeCard, regions[activeCard]);
     }
     void mousePressEvent(QMouseEvent *e) override {
+        if (activated)
+            activated();
         if (auto *reader = expandedReader()) {
             reader->focusReadingText();
             e->accept();
@@ -856,7 +882,7 @@ class SnapshotView : public QWidget {
                     .toAlignedRect()
                     .adjusted(-12, -12, 12, 12)
                     .intersected(image.rect());
-            if (multiple || keepSelection) {
+            if (sharedSession->multiple || keepSelection) {
                 if (!crop.isEmpty()) {
                     const auto path =
                         regionShots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
@@ -974,9 +1000,13 @@ class SnapshotView : public QWidget {
         ready = false;
         submitted = false;
     }
+    std::function<void()> closed, activated;
     SnapshotView(QImage img, bool copy, std::function<void(QImage, QPoint)> recognize,
-                 QScreen *targetScreen = nullptr)
-        : image(std::move(img)), recognizeRegion(std::move(recognize)), copySelection(copy) {
+                 QScreen *targetScreen = nullptr, std::shared_ptr<SnapshotSession> group = {})
+        : image(std::move(img)), recognizeRegion(std::move(recognize)), copySelection(copy),
+          sharedSession(group ? group : std::make_shared<SnapshotSession>()),
+          session(sharedSession->id), ownsSession(!group) {
+        sharedSession->views.append(this);
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowTitle(UiText::tr("Ranslator — select text"));
         QStringList recognized;
@@ -1082,7 +1112,8 @@ class SnapshotView : public QWidget {
         Capture::showOnScreen(this, targetScreen ? targetScreen : Capture::fallbackScreen(), true);
         activateWindow();
         setFocus();
-        send({{"type", "snapshot_start"}, {"session", session}});
+        if (ownsSession)
+            send({{"type", "snapshot_start"}, {"session", session}});
     }
 };
 
@@ -1340,14 +1371,20 @@ class Window : public GlassWindow {
     QPointer<QDialog> settings;
     QPointer<QLabel> settingsError;
     QPointer<SnapshotView> overlay;
+    QList<QPointer<SnapshotView>> snapshotViews;
+    std::shared_ptr<SnapshotSession> snapshotSession;
+    struct OcrTarget {
+        QPointer<SnapshotView> view;
+        QRect crop;
+        QPoint offset;
+    };
+    QHash<QString, QList<OcrTarget>> ocrTargets;
     QuickPopup *quick = nullptr;
     bool quickSession = false;
     bool quickPending = false;
     QString translationRequest;
     QTemporaryDir shots{Capture::temporaryDirectoryTemplate()};
     QList<QAction *> shortcuts;
-    QString screenshotPath;
-    QPoint snapshotOffset;
     QString translatedSource, translatedTarget;
     bool smokeMode;
     bool readingSelection = false;
@@ -1470,8 +1507,23 @@ class Window : public GlassWindow {
               {"source", languageValue(sourceLanguage)},
               {"target", languageValue(targetLanguage)}});
     }
-    void loadImage(const QString &path, QScreen *targetScreen = nullptr,
-                   bool imageMetadata = false) {
+    void closeSnapshots(SnapshotView *closing = nullptr) {
+        const auto views = std::exchange(snapshotViews, {});
+        for (auto view : views)
+            if (view) {
+                view->closed = {};
+                if (view != closing)
+                    view->close();
+            }
+        overlay = nullptr;
+        ocrTargets.clear();
+        if (snapshotSession) {
+            send({{"type", "snapshot_end"}, {"session", snapshotSession->id}});
+            snapshotSession.reset();
+        }
+    }
+    void loadImage(const QString &path, QScreen *targetScreen = nullptr, bool imageMetadata = false,
+                   bool desktopImage = false) {
         QImageReader reader(path);
         const QSize size = reader.size();
         if (!size.isValid() || qint64(size.width()) * size.height() > 120000000) {
@@ -1486,27 +1538,64 @@ class Window : public GlassWindow {
         }
         auto *screen = Capture::imageScreen(
             img, targetScreen ? targetScreen : Capture::fallbackScreen(), imageMetadata);
-        if (overlay)
-            overlay->close();
+        auto outputs = QGuiApplication::screens();
+        QList<QRect> geometries;
+        for (auto *output : outputs)
+            geometries.append(output->geometry());
+        QList<QRect> crops;
+        // A portal may return the whole workspace even when asked for the current output.
+        if (desktopImage || (imageMetadata && img.text("screen").isEmpty()))
+            crops = Capture::desktopCrops(img.size(), geometries);
+        if (desktopImage && crops.isEmpty()) {
+            receive({{"type", "error"},
+                     {"text", UiText::tr("The screenshot does not match the monitor layout. Try "
+                                         "Current monitor or System picker.")}});
+            return;
+        }
+        if (crops.isEmpty()) {
+            outputs = {screen};
+            crops = {img.rect()};
+        }
+        closeSnapshots();
         hide();
-        snapshotOffset = {};
-        screenshotPath = shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
+        const auto screenshotPath =
+            shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
         if (!QFile::copy(path, screenshotPath)) {
             setStatus(UiText::tr("Could not prepare screenshot."));
             return;
         }
-        overlay = new SnapshotView(
-            img, config["snapshot_copy_text"].toBool(),
-            [this](QImage crop, QPoint offset) {
-                const auto path =
-                    shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
-                if (!crop.save(path))
-                    return;
-                screenshotPath = path;
-                snapshotOffset = offset;
-                send({{"type", "ocr"}, {"path", path}});
-            },
-            screen);
+        snapshotSession = std::make_shared<SnapshotSession>();
+        send({{"type", "snapshot_start"}, {"session", snapshotSession->id}});
+        for (int index = 0; index < outputs.size(); ++index) {
+            auto holder = std::make_shared<QPointer<SnapshotView>>();
+            auto *view = new SnapshotView(
+                img.copy(crops[index]), config["snapshot_copy_text"].toBool(),
+                [this, holder](QImage crop, QPoint offset) {
+                    if (!*holder)
+                        return;
+                    const auto path =
+                        shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
+                    if (!crop.save(path))
+                        return;
+                    ocrTargets.insert(path, {{*holder, {}, offset}});
+                    send({{"type", "ocr"}, {"path", path}});
+                },
+                outputs[index], snapshotSession);
+            *holder = view;
+            view->closed = [this, view] { closeSnapshots(view); };
+            view->activated = [this, view] { overlay = view; };
+            snapshotViews.append(view);
+            ocrTargets[screenshotPath].append({view, crops[index], {}});
+            connect(outputs[index], &QObject::destroyed, view, [this] { closeSnapshots(); });
+            if (outputs[index] == screen)
+                overlay = view;
+        }
+        if (!overlay && !snapshotViews.isEmpty())
+            overlay = snapshotViews.first();
+        if (overlay) {
+            overlay->activateWindow();
+            overlay->setFocus();
+        }
         send({{"type", "ocr"}, {"path", screenshotPath}});
     }
     void capturePortal(unsigned generation) {
@@ -1525,7 +1614,8 @@ class Window : public GlassWindow {
                          {"text", UiText::tr("Screenshot portal returned an unsupported URI.")}});
                     return;
                 }
-                loadImage(url.toLocalFile(), captureScreen, true);
+                loadImage(url.toLocalFile(), captureScreen, true,
+                          config["capture_mode"].toString() == "desktop");
             },
             config["capture_mode"].toString("auto"));
     }
@@ -1606,8 +1696,7 @@ class Window : public GlassWindow {
         hide();
         if (quick)
             quick->hide();
-        if (overlay)
-            overlay->close();
+        closeSnapshots();
         QTimer::singleShot(wasVisible ? 40 : 0, this, [this, generation, gnomeMonitor] {
             if (generation != captureGeneration)
                 return;
@@ -1624,13 +1713,14 @@ class Window : public GlassWindow {
                         }
                         if (auto *screen = GnomeDesktop::screenForContext(context))
                             captureScreen = screen;
-                        auto finish = [this, generation](QImage captured) {
+                        auto finish = [this, generation, mode](QImage captured) {
                             if (generation != captureGeneration || captured.isNull())
                                 return;
                             const auto path =
                                 shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
                             if (captured.save(path))
-                                loadImage(path, captureScreen);
+                                loadImage(path, captureScreen, false,
+                                          config["capture_mode"].toString() == "desktop");
                             else
                                 receive(
                                     {{"type", "error"},
@@ -1654,13 +1744,14 @@ class Window : public GlassWindow {
                         receive({{"type", "error"}, { "text", error }});
                         return;
                     }
-                    auto finish = [this, generation](QImage captured) {
+                    auto finish = [this, generation, mode](QImage captured) {
                         if (generation != captureGeneration || captured.isNull())
                             return;
                         const auto path =
                             shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
                         if (captured.save(path))
-                            loadImage(path, captureScreen);
+                            loadImage(path, captureScreen, false,
+                                      config["capture_mode"].toString() == "desktop");
                         else
                             receive({{"type", "error"},
                                      { "text",
@@ -1682,7 +1773,8 @@ class Window : public GlassWindow {
                         const auto path =
                             shots.filePath(QUuid::createUuid().toString(QUuid::Id128) + ".png");
                         if (image.save(path))
-                            loadImage(path, captureScreen);
+                            loadImage(path, captureScreen, false,
+                                      config["capture_mode"].toString() == "desktop");
                         else
                             receive({{"type", "error"},
                                      {"text", UiText::tr("Could not save the captured image.")}});
@@ -1708,7 +1800,7 @@ class Window : public GlassWindow {
                 process->deleteLater();
                 if (generation == captureGeneration) {
                     if (!failed && QFile::exists(path))
-                        loadImage(path, captureScreen, mode != "desktop");
+                        loadImage(path, captureScreen, mode != "desktop", mode == "desktop");
                     else if (mode == "auto")
                         capturePortal(generation);
                     else
@@ -1853,22 +1945,38 @@ class Window : public GlassWindow {
             [this](QString error) { setStatus(error); });
 #endif
     }
-    void openPacks(QLineEdit *codes, QLineEdit *directory, QDialog *parent) {
+    void openPacks(QLineEdit *codes, QLineEdit *directory, QDialog *parent,
+                   bool installedOnly = false) {
         auto *dialog = new GlassDialog(parent);
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         dialog->setWindowTitle(UiText::tr("OCR language packs"));
         dialog->setWindowModality(Qt::WindowModal);
-        dialog->resize(600, 640);
+        dialog->resize(640, 700);
         auto *layout = new QVBoxLayout(dialog);
         layout->setContentsMargins(42, 42, 42, 42);
-        layout->addWidget(label(UiText::tr("Read more languages"), "heading"));
+        layout->addWidget(label(UiText::tr("Choose OCR languages"), "heading"));
         auto *explanation = label(
             UiText::tr(
-                "Choose up to eight languages you expect to see. Fewer languages give faster, more "
-                "accurate recognition. Downloads come from Tesseract's official model repository."),
+                "Installed models are detected automatically. Select the languages you want to "
+                "recognize, or use Select all. More active languages can make recognition slower."),
             "muted");
         explanation->setWordWrap(true);
         layout->addWidget(explanation);
+        auto *search = new QLineEdit;
+        search->setObjectName("ocrLanguageSearch");
+        search->setPlaceholderText(UiText::tr("Search by language or code…"));
+        search->setAccessibleName(UiText::tr("Search OCR languages"));
+        search->setClearButtonEnabled(true);
+        layout->addWidget(search);
+        auto *installedFilter = new QCheckBox(UiText::tr("Installed only"));
+        installedFilter->setObjectName("ocrInstalledOnly");
+        installedFilter->setChecked(installedOnly);
+        auto *refresh = button(UiText::tr("Refresh installed models"));
+        auto *filterRow = new QHBoxLayout;
+        filterRow->addWidget(installedFilter);
+        filterRow->addStretch();
+        filterRow->addWidget(refresh);
+        layout->addLayout(filterRow);
         auto *list = new QScrollArea;
         list->setWidgetResizable(true);
         auto *listContents = new QWidget;
@@ -1876,7 +1984,8 @@ class Window : public GlassWindow {
         listLayout->setAlignment(Qt::AlignTop);
         list->setWidget(listContents);
         const auto checks = std::make_shared<QList<QCheckBox *>>();
-        list->setAccessibleName(UiText::tr("OCR languages to install"));
+        list->setAccessibleName(UiText::tr("OCR languages to use"));
+        list->setObjectName("ocrModelList");
         layout->addWidget(list);
         auto *bulk = button(UiText::tr("Download all packs"));
         auto *selectAll = button(UiText::tr("Select all"));
@@ -1889,7 +1998,8 @@ class Window : public GlassWindow {
         auto *message = label(UiText::tr("Loading language packs…"), "muted");
         message->setWordWrap(true);
         layout->addWidget(message);
-        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+        auto *buttons = new QDialogButtonBox;
+        buttons->addButton(button(UiText::tr("Cancel")), QDialogButtonBox::RejectRole);
         auto *apply = button(UiText::tr("Use selected"), "primary");
         buttons->addButton(apply, QDialogButtonBox::AcceptRole);
         apply->setEnabled(false);
@@ -1897,23 +2007,55 @@ class Window : public GlassWindow {
         const auto id = ++settingsRequest;
         const auto downloadAll = std::make_shared<bool>(false);
         const QPointer<QDialog> guard(dialog);
-        const auto chosen = codes->text().split('+');
+        const auto chosen = codes->text().split('+', Qt::SkipEmptyParts);
+        auto selectedCodes = [=] {
+            QStringList selected;
+            // Preserve recognition priority for already selected languages.
+            for (const auto &code : chosen)
+                for (auto *check : *checks)
+                    if (check->isChecked() && check->property("code").toString() == code)
+                        selected << code;
+            for (auto *check : *checks)
+                if (check->isChecked() && !selected.contains(check->property("code").toString()))
+                    selected << check->property("code").toString();
+            return selected;
+        };
+        const auto pendingChoice = std::make_shared<QStringList>(chosen);
+        auto filter = [=] {
+            const auto query = search->text().trimmed();
+            for (auto *check : *checks)
+                check->setVisible(
+                    (!installedFilter->isChecked() || check->property("installed").toBool() ||
+                     check->isChecked()) &&
+                    (query.isEmpty() || check->text().contains(query, Qt::CaseInsensitive)));
+            bulk->setVisible(!installedFilter->isChecked());
+        };
+        connect(search, &QLineEdit::textChanged, dialog, filter);
+        connect(installedFilter, &QCheckBox::toggled, dialog, filter);
         auto update = [=] {
-            int count = 0;
+            int count = 0, installed = 0;
+            bool unavailable = false;
             qint64 bytes = 0;
             for (auto *check : *checks) {
+                installed += check->property("installed").toBool();
                 if (check->isChecked()) {
                     ++count;
                     bytes += check->property("bytes").toLongLong();
+                    unavailable |= !check->property("installed").toBool() &&
+                                   !check->property("downloadable").toBool();
                 }
             }
-            apply->setEnabled(count > 0 && (count <= 8 || bytes > 0));
-            apply->setText(count > 8   ? UiText::tr("Download selected")
-                           : bytes > 0 ? UiText::tr("Download and use")
-                                       : UiText::tr("Use selected"));
-            message->setText(QString(UiText::tr("%1 selected · %2 MB to download"))
-                                 .arg(count)
-                                 .arg(bytes / 1000000.0, 0, 'f', 1));
+            apply->setEnabled(!unavailable && count > 0);
+            apply->setText(bytes > 0 ? UiText::tr("Download and use") : UiText::tr("Use selected"));
+            message->setText(
+                unavailable
+                    ? UiText::tr(
+                          "A selected model was not found. Deselect it or choose its folder.")
+                    : QString(UiText::tr("%1 installed · %2 selected · %3 MB to download"))
+                          .arg(installed)
+                          .arg(count)
+                          .arg(bytes / 1000000.0, 0, 'f', 1));
+            filter();
         };
         onPacks = [=](QJsonObject value) {
             if (!guard || quint64(value["id"].toDouble()) != id)
@@ -1923,22 +2065,39 @@ class Window : public GlassWindow {
                 bulk->setEnabled(true);
                 qDeleteAll(*checks);
                 checks->clear();
-                for (auto entry : value["packs"].toArray()) {
+                auto entries = value["packs"].toArray();
+                for (const auto &code : *pendingChoice) {
+                    bool found = false;
+                    for (const auto &entry : entries)
+                        found |= entry.toObject()["code"].toString() == code;
+                    if (!found)
+                        entries.append(QJsonObject{{"code", code},
+                                                   {"name", code},
+                                                   {"installed", false},
+                                                   {"downloadable", false}});
+                }
+                for (auto entry : entries) {
                     auto pack = entry.toObject();
                     const auto code = pack["code"].toString();
                     const bool installed = pack["installed"].toBool();
+                    const bool downloadable = pack["downloadable"].toBool(true);
                     auto *check = new QCheckBox(
-                        pack["name"].toString() +
-                            (installed ? UiText::tr(" · Ready")
-                                       : QString(UiText::tr(" · %1 MB"))
-                                             .arg(pack["bytes"].toDouble() / 1000000.0, 0, 'f', 1)),
+                        pack["name"].toString() + " · " + code +
+                            (installed ? UiText::tr(" · Installed")
+                             : !downloadable
+                                 ? UiText::tr(" · Not found")
+                                 : QString(UiText::tr(" · %1 MB"))
+                                       .arg(pack["bytes"].toDouble() / 1000000.0, 0, 'f', 1)),
                         listContents);
                     check->setMinimumHeight(30);
                     check->setProperty("code", code);
+                    check->setProperty("installed", installed);
+                    check->setProperty("downloadable", downloadable);
+                    check->setToolTip(pack["path"].toString());
                     check->setProperty("bytes", installed ? 0 : pack["bytes"].toDouble());
                     listLayout->addWidget(check);
                     checks->append(check);
-                    check->setChecked(chosen.contains(code));
+                    check->setChecked(pendingChoice->contains(code));
                     connect(check, &QCheckBox::toggled, dialog, [update](bool) { update(); });
                 }
                 update();
@@ -1948,6 +2107,7 @@ class Window : public GlassWindow {
                 clearChoices->setEnabled(true);
                 selectAll->setEnabled(true);
                 bulk->setEnabled(true);
+                refresh->setEnabled(true);
                 const auto error = value["error"].toString();
                 if (!error.isEmpty()) {
                     list->setEnabled(true);
@@ -1958,17 +2118,14 @@ class Window : public GlassWindow {
                 } else if (*downloadAll) {
                     *downloadAll = false;
                     list->setEnabled(true);
+                    installedFilter->setChecked(true);
                     message->setText(UiText::tr(
                         "All packs downloaded. Choose your active OCR languages below."));
                     send({{"type", "list_packs"},
                           {"id", qint64(id)},
                           {"directory", directory->text()}});
                 } else {
-                    QStringList selected;
-                    for (auto *check : *checks)
-                        if (check->isChecked())
-                            selected << check->property("code").toString();
-                    codes->setText(selected.join('+'));
+                    codes->setText(selectedCodes().join('+'));
                     dialog->accept();
                 }
             }
@@ -1977,7 +2134,12 @@ class Window : public GlassWindow {
         connect(dialog, &QDialog::finished, this, [](int) { send({{"type", "cancel_packs"}}); });
         connect(selectAll, &QPushButton::clicked, dialog, [=] {
             for (auto *check : *checks)
-                check->setChecked(true);
+                if (!check->isHidden())
+                    check->setChecked(true);
+        });
+        connect(refresh, &QPushButton::clicked, dialog, [=] {
+            *pendingChoice = selectedCodes();
+            send({{"type", "list_packs"}, {"id", qint64(id)}, {"directory", directory->text()}});
         });
         connect(clearChoices, &QPushButton::clicked, dialog, [=] {
             for (auto *check : *checks)
@@ -1993,31 +2155,26 @@ class Window : public GlassWindow {
                 return;
             }
             *downloadAll = true;
+            *pendingChoice = chosen;
             list->setEnabled(false);
             apply->setEnabled(false);
             bulk->setEnabled(false);
             clearChoices->setEnabled(false);
             selectAll->setEnabled(false);
+            refresh->setEnabled(false);
             send({{"type", "install_packs"}, {"id", qint64(id)}, {"codes", missing}});
         });
         connect(apply, &QPushButton::clicked, dialog, [=] {
-            QJsonArray selected;
             QJsonArray download;
             bool missing = false;
             for (auto *check : *checks)
                 if (check->isChecked()) {
-                    selected.append(check->property("code").toString());
                     missing |= check->property("bytes").toLongLong() > 0;
                     if (check->property("bytes").toLongLong() > 0)
                         download.append(check->property("code").toString());
                 }
-            if (selected.size() > 8)
-                *downloadAll = true;
             if (!missing) {
-                QStringList names;
-                for (auto value : selected)
-                    names << value.toString();
-                codes->setText(names.join('+'));
+                codes->setText(selectedCodes().join('+'));
                 dialog->accept();
                 return;
             }
@@ -2025,6 +2182,8 @@ class Window : public GlassWindow {
             apply->setEnabled(false);
             bulk->setEnabled(false);
             selectAll->setEnabled(false);
+            clearChoices->setEnabled(false);
+            refresh->setEnabled(false);
             message->setText(UiText::tr("Starting download…"));
             send({{"type", "install_packs"}, {"id", qint64(id)}, {"codes", download}});
         });
@@ -2536,7 +2695,7 @@ class Window : public GlassWindow {
         captureMode->setObjectName("captureMode");
         captureMode->setAccessibleName(UiText::tr("Snapshot capture mode"));
         captureMode->addItem(UiText::tr("Current monitor · where Snapshot is invoked"), "auto");
-        captureMode->addItem(UiText::tr("All monitors · combined overview"), "desktop");
+        captureMode->addItem(UiText::tr("All monitors · one view on each screen"), "desktop");
         captureMode->addItem(UiText::tr("Select a rectangular area"), "region");
 #ifndef Q_OS_MACOS
         captureMode->addItem(UiText::tr("System screenshot picker"), "picker");
@@ -2564,8 +2723,8 @@ class Window : public GlassWindow {
                     "selection view returns to the monitor where Snapshot was invoked."));
             } else if (mode == "desktop") {
                 captureHelp->setText(UiText::tr(
-                    "Captures every connected monitor as one image. The combined overview opens "
-                    "on the monitor where you invoked Snapshot; scroll to zoom into it."));
+                    "Each monitor shows its own screenshot at the correct scale. Select text on "
+                    "any screen; its translation stays there. Escape closes all snapshot views."));
             } else if (mode == "region") {
                 captureHelp->setText(UiText::tr(
                     "Choose a rectangular area, then select its text in the frozen snapshot."));
@@ -2595,24 +2754,30 @@ class Window : public GlassWindow {
         auto *ocrLang = new QLineEdit(config["ocr_languages"].toString());
         ocrLang->setObjectName("ocrLanguages");
         ocr->addRow(UiText::tr("OCR languages"), ocrLang);
+        auto *chooseOcr = button(UiText::tr("Choose installed languages…"));
+        chooseOcr->setObjectName("chooseInstalledOcr");
+        ocr->addRow(chooseOcr);
         auto *data = new QLineEdit(config["tessdata_dir"].toString());
         data->setObjectName("ocrModelDirectory");
-        data->setPlaceholderText(UiText::tr("Bundled English model"));
+        data->setPlaceholderText(UiText::tr("Automatic · bundled, downloaded and system models"));
         ocr->addRow(UiText::tr("Custom model directory"), data);
         auto *packs = button(UiText::tr("Language packs…"));
         packs->setObjectName("ocrLanguagePacks");
         ocr->addRow(packs);
+        connect(chooseOcr, &QPushButton::clicked, dialog,
+                [=, this] { openPacks(ocrLang, data, dialog, true); });
         connect(packs, &QPushButton::clicked, dialog,
                 [=, this] { openPacks(ocrLang, data, dialog); });
         auto *ocrHelp = label("", "muted");
         ocrHelp->setObjectName("ocrEngineHelp");
         ocrHelp->setWordWrap(true);
         ocr->addRow(ocrHelp);
-        auto describeEngine = [ocrEngine, ocrLang, data, packs, ocrHelp] {
+        auto describeEngine = [ocrEngine, ocrLang, data, packs, chooseOcr, ocrHelp] {
             const bool vision = ocrEngine->currentData().toString() == "vision";
             // Vision needs no model files, so Tesseract's model controls would have no effect.
             data->setEnabled(!vision);
             packs->setEnabled(!vision);
+            chooseOcr->setVisible(!vision);
             ocrHelp->setText(
                 vision ? UiText::tr(
                              "Apple Vision reads most scripts and detects languages on its own; "
@@ -2622,9 +2787,9 @@ class Window : public GlassWindow {
                              "your device; only the words you select go to the translation "
                              "provider.")
                        : UiText::tr(
-                             "English is included. Language packs downloads extra OCR languages "
-                             "in one step. You can also use custom Tesseract files with codes "
-                             "such as eng+rus or eng+jpn. Screenshot text recognition stays on "
+                             "Choose installed languages with checkboxes; no language codes need "
+                             "to be typed. System, downloaded and custom models are detected "
+                             "automatically. Language packs adds more models. Recognition stays on "
                              "your device; only the words you select go to the translation "
                              "provider."));
         };
@@ -3119,9 +3284,15 @@ class Window : public GlassWindow {
         config["appearance"] = "light";
         Design::configure(config);
         save(this, "translator-light");
+        continuousButton->setChecked(true);
+        save(this, "translator-active-light");
+        continuousButton->setChecked(false);
         config["appearance"] = "dark";
         Design::configure(config);
         save(this, "translator-dark");
+        continuousButton->setChecked(true);
+        save(this, "translator-active-dark");
+        continuousButton->setChecked(false);
         quick->begin(config);
         quick->display(
             {{"text", "Before there was time, before there was anything, there was nothing"},
@@ -3164,8 +3335,9 @@ class Window : public GlassWindow {
     void receive(const QJsonObject &value) {
         const QString type = value["type"].toString();
         if (type == "snapshot_region") {
-            if (overlay && overlay->isVisible())
-                overlay->receiveRegion(value);
+            for (auto view : snapshotViews)
+                if (view && view->isVisible())
+                    view->receiveRegion(value);
         } else if (type == "runtimes") {
             if (onRuntimes)
                 onRuntimes(value);
@@ -3228,8 +3400,7 @@ class Window : public GlassWindow {
                 quick->setAccessibleDescription(value["text"].toString());
             } else
                 showCard();
-            if (overlay)
-                overlay->close();
+            closeSnapshots();
         } else if (type == "translation") {
             if (value["request_id"].toString() != translationRequest)
                 return;
@@ -3271,8 +3442,7 @@ class Window : public GlassWindow {
                 captureSelector->close();
             if (captureProcess)
                 captureProcess->kill();
-            if (overlay)
-                overlay->close();
+            closeSnapshots();
             working(false);
             setStatus(UiText::tr("Stopped. Your text stays here."));
         } else if (type == "provider")
@@ -3319,8 +3489,24 @@ class Window : public GlassWindow {
         } else if (type == "ocr") {
             working(false);
             const auto path = value["path"].toString();
-            if (overlay && path == screenshotPath)
-                overlay->setWords(value["words"].toArray(), snapshotOffset);
+            for (const auto &target : ocrTargets.take(path)) {
+                if (!target.view)
+                    continue;
+                QJsonArray words;
+                for (const auto &entry : value["words"].toArray()) {
+                    auto word = entry.toObject();
+                    const QRect box(word["x"].toInt(), word["y"].toInt(), word["width"].toInt(),
+                                    word["height"].toInt());
+                    if (!target.crop.isEmpty()) {
+                        if (!target.crop.contains(box.center()))
+                            continue;
+                        word["x"] = box.x() - target.crop.x();
+                        word["y"] = box.y() - target.crop.y();
+                    }
+                    words.append(word);
+                }
+                target.view->setWords(words, target.offset);
+            }
             QFile::remove(path);
         } else if (type == "config_saved") {
             config = value["config"].toObject();
@@ -3431,6 +3617,11 @@ extern "C" int ranslator_ui_run(const char *settings, Callback cb, bool backgrou
                         QJsonObject{
                             {"platform", QGuiApplication::platformName()},
                             {"desktop_blur_available", window->property("desktopBlur").toBool()},
+                            {"accent_color", Design::theme().accent.name()},
+                            {"font_family", qApp->font().family()},
+                            {"reduced_motion", Design::theme().reducedMotion},
+                            {"reduced_transparency", Design::theme().reducedTransparency},
+                            {"high_contrast", Design::theme().highContrast},
                             {"translucent_window",
                              window->testAttribute(Qt::WA_TranslucentBackground)}})
                         .toJson(QJsonDocument::Compact);

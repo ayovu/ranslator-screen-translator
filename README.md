@@ -36,7 +36,7 @@ Pick the row for the machine you build on. There are no cross builds: a Mac pack
 | macOS Apple Silicon | An Apple Silicon Mac with Xcode | `scripts/package-macos.sh` | `dist/macos-arm64/Ranslator.app` and ZIP | macOS 14.4 or newer\* |
 | macOS Intel | An Intel Mac with Xcode | `scripts/package-macos.sh` | `dist/macos-x86_64/Ranslator.app` and ZIP | macOS 14.4 or newer\* |
 
-\* Qt 6.12's minimum. The script raises it to the newest minimum among the bundled libraries, which is the build machine's macOS when Homebrew compiles them from source. The same source gives each platform its own look: Ranslator's glass on Linux; on macOS the system font, accent color, SF Symbols and Liquid Glass (macOS 26 and later; vibrancy on 14 and 15). Details: [Mac build guide](packaging/macos/README.md).
+\* Qt 6.12's minimum. The script raises it to the newest minimum among the bundled libraries, which is the build machine's macOS when Homebrew compiles them from source. Linux and macOS share the glass controls and animations, adapting fonts, accent colors and icons to the desktop. Linux uses compositor blur when available; macOS uses Liquid Glass (26 and later) or vibrancy (14 and 15). Details: [Appearance](docs/USER_GUIDE.md#appearance) and [Mac build guide](packaging/macos/README.md).
 
 For development on either platform, install the [platform dependencies](docs/USER_GUIDE.md#build-and-verify), then:
 

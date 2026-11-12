@@ -80,7 +80,7 @@ fn run() -> Result<()> {
         Some("--doctor") => {
             println!(
                 "{}",
-                json!({"platform": ranslator::platform::capabilities(), "config":Config::path(), "ocr_data":ocr::data_dir(&config), "english_ocr":ocr::data_dir(&config).join("eng.traineddata").exists(), "ocr_engine":ocr::engine(&config), "tesseract":std::process::Command::new(ocr::executable()).arg("--version").output().is_ok_and(|output| output.status.success()), "ollama_model":provider::local_model(), "wayland":std::env::var_os("WAYLAND_DISPLAY").is_some()})
+                json!({"platform": ranslator::platform::capabilities(), "config":Config::path(), "ocr_data":ocr::data_dir(&config), "english_ocr":ocr::data_dir(&config).join("eng.traineddata").exists(), "ocr_engine":ocr::engine(&config), "installed_ocr_models":ocr::installed_models(&config).keys().collect::<Vec<_>>(), "tesseract":std::process::Command::new(ocr::executable()).arg("--version").output().is_ok_and(|output| output.status.success()), "ollama_model":provider::local_model(), "wayland":std::env::var_os("WAYLAND_DISPLAY").is_some()})
             );
             return Ok(());
         }

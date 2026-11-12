@@ -5,6 +5,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::{AtomicBool, Ordering},
@@ -196,25 +197,75 @@ fn recognize_tesseract(config: &Config, image: &Path, cancel: &Cancellation) -> 
 }
 
 pub fn model_path(config: &Config, language: &str) -> Option<PathBuf> {
-    if language.is_empty()
-        || !language
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
+    if !model_code(language) {
         return None;
     }
     let name = format!("{language}.traineddata");
+    model_directories(config)
+        .into_iter()
+        .map(|dir| dir.join(&name))
+        .find(|path| path.is_file())
+}
+
+fn model_code(language: &str) -> bool {
+    !language.is_empty()
+        && language
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+// Discovery and recognition must use exactly the same directories and precedence.
+fn model_directories(config: &Config) -> Vec<PathBuf> {
     let mut directories = vec![];
     if !config.tessdata_dir.is_empty() {
         directories.push(PathBuf::from(&config.tessdata_dir));
     }
-    directories.extend([
-        crate::packs::directory(),
-        bundled_data_dir(),
-        PathBuf::from("/usr/share/tessdata"),
-    ]);
-    directories
-        .into_iter()
-        .map(|dir| dir.join(&name))
-        .find(|path| path.is_file())
+    directories.extend([crate::packs::directory(), bundled_data_dir()]);
+    if let Some(prefix) = std::env::var_os("TESSDATA_PREFIX").filter(|p| !p.is_empty()) {
+        directories.push(prefix.into());
+    }
+    directories.extend(
+        [
+            "/usr/share/tessdata",
+            "/usr/share/tesseract-ocr/5/tessdata",
+            "/usr/share/tesseract-ocr/4.00/tessdata",
+            "/usr/local/share/tessdata",
+            "/opt/homebrew/share/tessdata",
+        ]
+        .map(PathBuf::from),
+    );
+    let mut unique = Vec::new();
+    for directory in directories {
+        if !unique.contains(&directory) {
+            unique.push(directory);
+        }
+    }
+    unique
+}
+
+pub fn installed_models(config: &Config) -> BTreeMap<String, PathBuf> {
+    let mut models = BTreeMap::new();
+    for directory in model_directories(config) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .extension()
+                .is_none_or(|extension| extension != "traineddata")
+                || !path.is_file()
+            {
+                continue;
+            }
+            let Some(code) = path.file_stem().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            // Orientation/script detection is not a language recognizer.
+            if model_code(code) && code != "osd" {
+                models.entry(code.to_owned()).or_insert(path);
+            }
+        }
+    }
+    models
 }

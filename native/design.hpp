@@ -2,8 +2,8 @@
 #include <QtWidgets>
 
 namespace Design {
-// macOS builds follow the platform's visual language (system font, accent color, materials,
-// SF Symbols and springs); other platforms keep Ranslator's own glass style.
+// Platform conventions (keyboard modifiers and Apple font families) stay platform-specific.
+// Material geometry, capsule controls and motion are shared across desktop builds.
 #ifdef Q_OS_MACOS
 constexpr bool macStyle = true;
 #else
@@ -13,22 +13,18 @@ struct Theme {
     bool dark = false;
     bool reducedMotion = false;
     bool reducedTransparency = false;
+    bool highContrast = false;
     bool blur = false;
     QColor accent{"#487ff2"};
-    QColor ink() const {
-        if (macStyle)
-            return dark ? QColor("#f5f5f7") : QColor("#1d1d1f");
-        return dark ? QColor("#f2f5fc") : QColor("#202b3c");
-    }
+    QColor ink() const { return dark ? QColor("#f5f5f7") : QColor("#1d1d1f"); }
     QColor secondary() const {
-        if (macStyle)
-            return dark ? QColor("#98989f") : QColor("#6e6e73");
-        return dark ? QColor("#a8b4c9") : QColor("#65758b");
+        return highContrast ? ink() : (dark ? QColor("#98989f") : QColor("#6e6e73"));
     }
+    QColor onAccent() const;
 };
 // Window body geometry inside the transparent shadow canvas.
 constexpr qreal windowInset = 20;
-constexpr qreal windowRadius = macStyle ? 26 : 30;
+constexpr qreal windowRadius = 26;
 // A critically damped-ish spring (slight settle, no visible bounce) for interface motion.
 QEasingCurve spring();
 Theme &theme();

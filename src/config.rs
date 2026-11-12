@@ -252,12 +252,11 @@ impl Config {
             bail!("Enter the model identifier.");
         }
         let languages: Vec<_> = self.ocr_languages.split('+').collect();
-        if languages.len() > 8
-            || languages
-                .iter()
-                .collect::<std::collections::HashSet<_>>()
-                .len()
-                != languages.len()
+        if languages
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+            != languages.len()
             || languages.iter().any(|language| {
                 language.is_empty()
                     || !language
@@ -265,7 +264,7 @@ impl Config {
                         .all(|c| c.is_ascii_alphanumeric() || c == '_')
             })
         {
-            bail!("Choose one to eight OCR languages, such as eng or eng+deu.");
+            bail!("Choose one or more distinct OCR languages, such as eng or eng+deu.");
         }
         Ok(())
     }

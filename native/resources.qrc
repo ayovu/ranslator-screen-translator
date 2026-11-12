@@ -5,6 +5,7 @@
   <file alias="OFL.txt">../assets/fonts/OFL.txt</file>
   <file alias="chevron.svg">../assets/icons/chevron.svg</file>
   <file alias="check.svg">../assets/icons/check.svg</file>
+  <file alias="check-dark.svg">../assets/icons/check-dark.svg</file>
   <file alias="chevron-up.svg">../assets/icons/chevron-up.svg</file>
   <file alias="fonts/NotoSansArabic.ttf">../assets/fonts/noto/NotoSansArabic.ttf</file>
   <file alias="fonts/NotoSansBengali.ttf">../assets/fonts/noto/NotoSansBengali.ttf</file>

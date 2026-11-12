@@ -9,7 +9,9 @@ Linux build cannot certify all of those combinations.
 | Check | What it establishes |
 | --- | --- |
 | `scripts/check-build.sh` | Rust formatting/lints/tests and native interaction suites. Linux additionally exercises private D-Bus portals, accessibility fixtures and X11/Xvfb. |
+| Native `desktop_appearance` / UI tests | A private Settings portal exercises live accent/theme/accessibility updates, invalid values, delayed replies and service restarts. Rendering tests cover opaque fallback, segmented controls, reduced motion and palette changes. They do not certify every compositor's blur or icon theme. |
 | Native `autostart_registration` / UI tests | XDG state and launcher paths, write failures, tray/settings synchronization, Background portal approval/denial/timeout and late responses in isolated profiles. They do not log out of a real desktop. |
+| `scripts/check-desktop-ui.py` | Starts a private headless KWin with two outputs. Verifies per-output snapshot crops, shared-session result routing and cancellation, and live blur over a changing synthetic background in both themes. Never captures the user’s desktop. |
 | `scripts/check-multi-snapshot.py` | Three real mouse selections, crop OCR, out-of-order translations, card dragging and Escape against a mock provider on a private display. |
 | `scripts/check-host-runtimes.py` | Synthetic host commands inside a real Flatpak, including cancellation, timeout, errors and permission denial. No AI accounts are used. |
 | `scripts/check-bundled-providers.py` | Actual AppDir/AppImage/Flatpak executables against synthetic host-loopback Ollama and compatible API servers: discovery, translation, credentials, errors and denied network access. No remote service or model quality is tested. |

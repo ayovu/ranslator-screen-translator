@@ -11,6 +11,26 @@
 #endif
 
 namespace Capture {
+QList<QRect> desktopCrops(QSize pixels, const QList<QRect> &outputs) {
+    QRect bounds;
+    for (const auto &output : outputs)
+        bounds |= output;
+    if (bounds.isEmpty() || pixels.isEmpty())
+        return {};
+    const qreal scale = qreal(pixels.width()) / bounds.width();
+    // Do not stretch a region/single-monitor screenshot over an unrelated desktop layout.
+    if (qAbs(pixels.height() - bounds.height() * scale) > 2)
+        return {};
+    QList<QRect> crops;
+    for (const auto &output : outputs) {
+        const auto origin = output.topLeft() - bounds.topLeft();
+        const int x = qRound(origin.x() * scale), y = qRound(origin.y() * scale);
+        const int right = qRound((origin.x() + output.width()) * scale);
+        const int bottom = qRound((origin.y() + output.height()) * scale);
+        crops.append(QRect(x, y, right - x, bottom - y).intersected(QRect(QPoint(), pixels)));
+    }
+    return crops;
+}
 QScreen *screenNamed(const QString &name) {
     for (auto *screen : QGuiApplication::screens())
         if (screen->name() == name)

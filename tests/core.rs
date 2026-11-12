@@ -420,13 +420,7 @@ fn ocr_pack_checksum_rejects_corrupt_and_truncated_downloads() {
 
 #[test]
 fn ocr_rejects_empty_duplicate_and_path_languages() {
-    for languages in [
-        "eng+",
-        "eng++rus",
-        "eng+eng",
-        "../eng",
-        "eng+spa+rus+ukr+deu+fra+ita+por+pol",
-    ] {
+    for languages in ["", "eng+", "eng++rus", "eng+eng", "../eng"] {
         let config = Config {
             ocr_languages: languages.into(),
             ..Config::default()
@@ -434,6 +428,25 @@ fn ocr_rejects_empty_duplicate_and_path_languages() {
         assert!(config.validate().is_err(), "{languages}");
     }
     assert!(ocr::model_path(&Config::default(), "../eng").is_none());
+}
+
+#[test]
+fn ocr_can_enable_the_entire_catalog_and_custom_languages() {
+    let mut languages: Vec<_> = ranslator::packs::catalog()
+        .packs
+        .iter()
+        .map(|pack| pack.code.as_str())
+        .collect();
+    languages.push("private_model");
+    assert!(languages.len() > 8);
+    let config = Config {
+        ocr_languages: languages.join("+"),
+        ..Config::default()
+    };
+    config.validate().unwrap();
+    let restored: Config = serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+    assert_eq!(restored.ocr_languages, config.ocr_languages);
+    restored.validate().unwrap();
 }
 
 #[test]
@@ -456,6 +469,52 @@ fn custom_directory_can_be_combined_with_bundled_english() {
         ..Config::default()
     };
     assert!(ocr::model_path(&config, "eng").is_some());
+}
+
+#[test]
+fn installed_ocr_models_include_custom_files_and_match_recognition_precedence() {
+    use ranslator::packs;
+    let directory = tempfile::tempdir().unwrap();
+    for name in [
+        "eng.traineddata",
+        "private_model.traineddata",
+        "osd.traineddata",
+        "bad-name.traineddata",
+        "ignored.txt",
+    ] {
+        std::fs::write(directory.path().join(name), b"model fixture").unwrap();
+    }
+    std::fs::create_dir(directory.path().join("folder.traineddata")).unwrap();
+    let config = Config {
+        tessdata_dir: directory.path().to_str().unwrap().into(),
+        ..Config::default()
+    };
+    let models = ocr::installed_models(&config);
+    assert_eq!(
+        models.get("eng"),
+        Some(&directory.path().join("eng.traineddata"))
+    );
+    assert_eq!(
+        models.get("private_model"),
+        ocr::model_path(&config, "private_model").as_ref()
+    );
+    for code in ["osd", "bad-name", "ignored", "folder"] {
+        assert!(!models.contains_key(code));
+    }
+    let list = packs::list(&config);
+    let rows = list.as_array().unwrap();
+    assert_eq!(rows.iter().filter(|r| r["code"] == "eng").count(), 1);
+    let custom = rows.iter().find(|r| r["code"] == "private_model").unwrap();
+    assert_eq!(custom["installed"], true);
+    assert_eq!(custom["downloadable"], false);
+    assert_eq!(
+        custom["path"],
+        directory
+            .path()
+            .join("private_model.traineddata")
+            .to_str()
+            .unwrap()
+    );
 }
 
 #[test]

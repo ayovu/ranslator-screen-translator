@@ -98,24 +98,24 @@
         <location line="+1"/>
         <location line="+7"/>
         <location line="+187"/>
-        <location line="+814"/>
+        <location line="+845"/>
         <location line="+86"/>
         <source>Auto</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1092"/>
+        <location line="-1123"/>
         <source>Detected source: %1. Choose a language to correct this estimate.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+1091"/>
+        <location line="+1122"/>
         <source>Detect the source language, or choose it yourself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1089"/>
+        <location line="-1120"/>
         <source>Detected %1 → %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -137,15 +137,15 @@
     <message>
         <location line="+12"/>
         <location line="+102"/>
-        <location line="+714"/>
+        <location line="+745"/>
         <location line="+108"/>
-        <location line="+1625"/>
+        <location line="+1759"/>
         <location line="+20"/>
         <source>TRANSLATION</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-2567"/>
+        <location line="-2732"/>
         <location line="+76"/>
         <source>Read this translation full screen</source>
         <translation type="unfinished"></translation>
@@ -157,12 +157,12 @@
     </message>
     <message>
         <location line="+3"/>
-        <location line="+548"/>
+        <location line="+574"/>
         <source>Reading selected area…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-545"/>
+        <location line="-571"/>
         <source>Shift or Esc to return to the card</source>
         <translation type="unfinished"></translation>
     </message>
@@ -184,12 +184,12 @@
     </message>
     <message>
         <location line="+2"/>
-        <location line="+813"/>
+        <location line="+844"/>
         <source>Retry</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-810"/>
+        <location line="-841"/>
         <source>Copy this translation</source>
         <translation type="unfinished"></translation>
     </message>
@@ -200,12 +200,12 @@
     </message>
     <message>
         <location line="+33"/>
-        <location line="+868"/>
+        <location line="+899"/>
         <source>COULD NOT TRANSLATE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-814"/>
+        <location line="-834"/>
         <source>Select more text · Drag cards · Esc to leave</source>
         <translation type="unfinished"></translation>
     </message>
@@ -215,15 +215,15 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+191"/>
-        <location line="+478"/>
+        <location line="+195"/>
+        <location line="+494"/>
         <location line="+87"/>
         <location line="+35"/>
         <source>Translating…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-419"/>
+        <location line="-424"/>
         <source>Could not prepare this region. Select again to retry.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -233,7 +233,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+12"/>
         <source>Ranslator — select text</source>
         <translation type="unfinished"></translation>
     </message>
@@ -259,28 +259,29 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+881"/>
+        <location line="+960"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-878"/>
-        <location line="+1446"/>
+        <location line="-957"/>
+        <location line="+1575"/>
         <source>Translate selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1445"/>
+        <location line="-1574"/>
         <source>Translate all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+3"/>
+        <location line="+964"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-963"/>
         <source>Zoom</source>
         <translation type="unfinished"></translation>
     </message>
@@ -295,7 +296,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+70"/>
         <source>Quick translation</source>
         <translation type="unfinished"></translation>
     </message>
@@ -342,17 +343,17 @@
     </message>
     <message>
         <location line="+31"/>
-        <location line="+142"/>
+        <location line="+148"/>
         <source>Auto · %1 / %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-114"/>
+        <location line="-120"/>
         <source>TRANSLATING</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+81"/>
+        <location line="+87"/>
         <source>Waiting for the system… Approve its permission dialog if shown.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -373,13 +374,13 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1646"/>
+        <location line="+1774"/>
         <location line="+12"/>
         <source>Start at login</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1634"/>
+        <location line="-1762"/>
         <source>Translate into %1; use %2 when the source already matches. Choose a language to override.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -390,12 +391,12 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+1491"/>
+        <location line="+1619"/>
         <source>Translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1466"/>
+        <location line="-1594"/>
         <source>Select text, then press %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -405,7 +406,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+33"/>
         <source>Image is invalid or exceeds 120 megapixels.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -415,24 +416,29 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+15"/>
+        <source>The screenshot does not match the monitor layout. Try Current monitor or System picker.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Could not prepare screenshot.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+50"/>
         <source>Screenshot portal returned an unsupported URI.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+27"/>
         <source>This desktop does not share the current selection. Use Select once or Snapshot instead.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+86"/>
-        <location line="+30"/>
-        <location line="+21"/>
+        <location line="+31"/>
+        <location line="+22"/>
         <source>Could not save the captured image.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -467,27 +473,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+47"/>
+        <location line="+48"/>
         <source>OCR language packs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
-        <source>Read more languages</source>
+        <location line="+7"/>
+        <source>Installed models are detected automatically. Select the languages you want to recognize, or use Select all. More active languages can make recognition slower.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>Choose up to eight languages you expect to see. Fewer languages give faster, more accurate recognition. Downloads come from Tesseract&apos;s official model repository.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>OCR languages to install</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
+        <location line="+31"/>
         <source>Download all packs</source>
         <translation type="unfinished"></translation>
     </message>
@@ -502,48 +498,33 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+4"/>
-        <location line="+20"/>
+        <location line="+5"/>
+        <location line="+46"/>
         <source>Use selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-2"/>
-        <source>Download selected</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+0"/>
         <source>Download and use</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>%1 selected · %2 MB to download</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+18"/>
-        <source> · Ready</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+40"/>
         <source> · %1 MB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+33"/>
         <source>All packs downloaded. Choose your active OCR languages below.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+32"/>
         <source>All language packs are already installed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+36"/>
+        <location line="+33"/>
         <source>Starting download…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -564,12 +545,12 @@
     </message>
     <message>
         <location line="+55"/>
-        <location line="+1047"/>
+        <location line="+1059"/>
         <source>Languages</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1046"/>
+        <location line="-1058"/>
         <source>One preferred language. A natural way back.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -600,12 +581,12 @@
     </message>
     <message>
         <location line="+7"/>
-        <location line="+1015"/>
+        <location line="+1027"/>
         <source>Translation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1015"/>
+        <location line="-1027"/>
         <source>Choose the engine that understands you.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -833,13 +814,13 @@
     <message>
         <location line="+1"/>
         <location line="+95"/>
-        <location line="+391"/>
+        <location line="+397"/>
         <location line="+77"/>
         <source>Snapshot</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-555"/>
+        <location line="-561"/>
         <source>Record shortcut: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -936,12 +917,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>All monitors · combined overview</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+2"/>
         <source>Select a rectangular area</source>
         <translation type="unfinished"></translation>
     </message>
@@ -956,12 +932,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
-        <source>Captures every connected monitor as one image. The combined overview opens on the monitor where you invoked Snapshot; scroll to zoom into it.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+9"/>
         <source>Choose a rectangular area, then select its text in the frozen snapshot.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -996,12 +967,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>Bundled English model</source>
+        <location line="+1"/>
+        <source>Choose installed languages…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+6"/>
         <source>Custom model directory</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1011,17 +982,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+18"/>
         <source>Apple Vision reads most scripts and detects languages on its own; OCR languages tell it which to prefer. The first recognition after installing or updating macOS prepares its models in the background and can take about a minute. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>English is included. Language packs downloads extra OCR languages in one step. You can also use custom Tesseract files with codes such as eng+rus or eng+jpn. Screenshot text recognition stays on your device; only the words you select go to the translation provider.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
+        <location line="+16"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1193,12 +1159,12 @@ in another language.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+374"/>
+        <location line="+379"/>
         <source>Auto translate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-373"/>
+        <location line="-378"/>
         <source>Keep listening</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1214,22 +1180,92 @@ in another language.</source>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+362"/>
+        <location line="+367"/>
         <source>Translate each new text selection in other apps; click again to stop · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-359"/>
+        <location line="-364"/>
         <source>Select text on screen · %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1502"/>
+        <location line="-1630"/>
         <source>Select anywhere with %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1412"/>
+        <location line="+471"/>
+        <source>Choose OCR languages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Search by language or code…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Search OCR languages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Installed only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Refresh installed models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>OCR languages to use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+65"/>
+        <source>A selected model was not found. Deselect it or choose its folder.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>%1 installed · %2 selected · %3 MB to download</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source> · Installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source> · Not found</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+610"/>
+        <source>All monitors · one view on each screen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Each monitor shows its own screenshot at the correct scale. Select text on any screen; its translation stays there. Escape closes all snapshot views.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>Automatic · bundled, downloaded and system models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Choose installed languages with checkboxes; no language codes need to be typed. System, downloaded and custom models are detected automatically. Language packs adds more models. Recognition stays on your device; only the words you select go to the translation provider.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+237"/>
         <source>Type or paste text here…
 %1 to translate</source>
         <translation type="unfinished"></translation>
@@ -1280,7 +1316,7 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+148"/>
+        <location line="+155"/>
         <source>Select some text first, then try again.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1290,12 +1326,12 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+50"/>
         <source>Ready · Change the target language to translate again.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+29"/>
         <source>Stopped. Your text stays here.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1330,7 +1366,7 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+29"/>
         <source>Saved. You can keep changing settings.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1340,7 +1376,7 @@ in another language.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../native/capture.cpp" line="+184"/>
+        <location filename="../native/capture.cpp" line="+204"/>
         <source>Select Snapshot area</source>
         <translation type="unfinished"></translation>
     </message>
