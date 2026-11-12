@@ -9,6 +9,11 @@ use std::{
 };
 
 static EVENTS: OnceLock<std::sync::mpsc::Sender<controller::Event>> = OnceLock::new();
+#[cfg(all(target_os = "macos", not(core_only)))]
+unsafe extern "C" {
+    fn ranslator_vision_ocr(image: *const c_char, languages: *const c_char) -> i32;
+    fn ranslator_vision_warm_up(languages: *const c_char) -> i32;
+}
 #[cfg(not(core_only))]
 unsafe extern "C" {
     fn ranslator_ui_run(
@@ -49,9 +54,22 @@ fn main() {
 }
 fn run() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    #[cfg(all(target_os = "macos", not(core_only)))]
+    if args.first().is_some_and(|arg| arg == ocr::VISION_OPTION) {
+        let target = args
+            .get(1)
+            .context("Usage: ranslator --vision-ocr IMAGE|--warm-up [LANGUAGES]")?;
+        let languages = CString::new(args.get(2).map_or("", String::as_str))?;
+        std::process::exit(if target == ocr::WARM_UP_OPTION {
+            unsafe { ranslator_vision_warm_up(languages.as_ptr()) }
+        } else {
+            let image = CString::new(target.as_str())?;
+            unsafe { ranslator_vision_ocr(image.as_ptr(), languages.as_ptr()) }
+        });
+    }
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Ranslator — native selection translation\n\n  ranslator                     Start in tray (popup mode)\n  ranslator --settings          Open settings\n  ranslator --window            Open full translator\n  ranslator --background        Start in tray\n  ranslator --select            Arm one selection (desktop keybinding command)\n  ranslator --listen            Toggle continuous selection\n  ranslator --snapshot          Capture screen (desktop keybinding command)\n  ranslator --translate [LANG]   Translate UTF-8 stdin\n  ranslator --image IMAGE        Open image in the OCR selection view\n  ranslator --quit               Quit the running app\n  ranslator --ocr IMAGE          Print OCR words as JSON\n  ranslator --doctor             Report dependencies and local models\n  ranslator --smoke-test PATH    Render widget to PNG, then exit\n  ranslator --design-preview DIR Render light/dark UI previews\n\nSettings: {}",
+            "Ranslator — native selection translation\n\n  ranslator                     Start in tray (popup mode)\n  ranslator --settings          Open settings\n  ranslator --window            Open full translator\n  ranslator --background        Start in tray\n  ranslator --translate-selection Translate the current selection (desktop keybinding command)\n  ranslator --select            Arm one selection (desktop keybinding command)\n  ranslator --listen            Toggle continuous selection\n  ranslator --snapshot          Capture screen (desktop keybinding command)\n  ranslator --translate [LANG]   Translate UTF-8 stdin\n  ranslator --image IMAGE        Open image in the OCR selection view\n  ranslator --quit               Quit the running app\n  ranslator --ocr IMAGE          Print OCR words as JSON\n  ranslator --doctor             Report dependencies and local models\n  ranslator --smoke-test PATH    Render widget to PNG, then exit\n  ranslator --design-preview DIR Render light/dark UI previews\n\nSettings: {}",
             Config::path().display()
         );
         return Ok(());
@@ -62,7 +80,7 @@ fn run() -> Result<()> {
         Some("--doctor") => {
             println!(
                 "{}",
-                json!({"platform": ranslator::platform::capabilities(), "config":Config::path(), "ocr_data":ocr::data_dir(&config), "english_ocr":ocr::data_dir(&config).join("eng.traineddata").exists(), "tesseract":std::process::Command::new(ocr::executable()).arg("--version").output().is_ok_and(|output| output.status.success()), "ollama_model":provider::local_model(), "wayland":std::env::var_os("WAYLAND_DISPLAY").is_some()})
+                json!({"platform": ranslator::platform::capabilities(), "config":Config::path(), "ocr_data":ocr::data_dir(&config), "english_ocr":ocr::data_dir(&config).join("eng.traineddata").exists(), "ocr_engine":ocr::engine(&config), "tesseract":std::process::Command::new(ocr::executable()).arg("--version").output().is_ok_and(|output| output.status.success()), "ollama_model":provider::local_model(), "wayland":std::env::var_os("WAYLAND_DISPLAY").is_some()})
             );
             return Ok(());
         }
@@ -92,8 +110,17 @@ fn run() -> Result<()> {
             return Ok(());
         }
         Some(
-            "--settings" | "--window" | "--background" | "--smoke-test" | "--design-preview"
-            | "--image" | "--quit" | "--select" | "--listen" | "--snapshot",
+            "--settings"
+            | "--window"
+            | "--background"
+            | "--smoke-test"
+            | "--design-preview"
+            | "--image"
+            | "--quit"
+            | "--translate-selection"
+            | "--select"
+            | "--listen"
+            | "--snapshot",
         )
         | None => (),
         Some(other) => anyhow::bail!("Unknown option: {other}. Use --help."),
@@ -123,6 +150,7 @@ fn run() -> Result<()> {
         startup["_quit"] = json!(true);
     }
     match args.first().map(String::as_str) {
+        Some("--translate-selection") => startup["_action"] = json!("translate_selection"),
         Some("--select") => startup["_action"] = json!("once"),
         Some("--listen") => startup["_action"] = json!("continuous"),
         Some("--snapshot") => startup["_action"] = json!("snapshot"),

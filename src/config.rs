@@ -62,6 +62,8 @@ pub struct Config {
     pub popup_mode: bool,
     pub snapshot_copy_text: bool,
     pub timeout_seconds: u64,
+    /// Translates the text that is already selected. An empty sequence disables it.
+    pub translate_selection: Binding,
     pub once: Binding,
     pub continuous: Binding,
     pub snapshot: Binding,
@@ -69,6 +71,8 @@ pub struct Config {
     pub selection_delay_ms: u64,
     pub watch_clipboard: bool,
     pub ocr_languages: String,
+    /// `auto` uses Apple Vision on macOS and Tesseract elsewhere.
+    pub ocr_engine: String,
     pub tessdata_dir: String,
     pub capture_mode: String,
     pub appearance: String,
@@ -93,6 +97,10 @@ impl Default for Config {
             popup_mode: true,
             snapshot_copy_text: false,
             timeout_seconds: 90,
+            translate_selection: Binding {
+                sequence: "Alt+Shift+C".into(),
+                taps: 1,
+            },
             once: Binding::default(),
             continuous: Binding {
                 sequence: "Ctrl+Alt+Y".into(),
@@ -106,6 +114,7 @@ impl Default for Config {
             selection_delay_ms: 500,
             watch_clipboard: false,
             ocr_languages: "eng".into(),
+            ocr_engine: "auto".into(),
             tessdata_dir: String::new(),
             capture_mode: "auto".into(),
             appearance: "system".into(),
@@ -136,10 +145,35 @@ impl Config {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let config: Self = serde_json::from_slice(&fs::read(&path)?)
+        let mut config: Self = serde_json::from_slice(&fs::read(&path)?)
             .context("Invalid settings JSON; original file was preserved")?;
+        config.adopt_new_bindings();
         config.validate()?;
         Ok(config)
+    }
+    /// Settings saved before Translate selection existed receive its default chord. When another
+    /// action already uses that chord, Translate selection is disabled rather than failing to load.
+    pub fn adopt_new_bindings(&mut self) {
+        let chord = |binding: &Binding| {
+            crate::state::canonical_modifier(&binding.sequence)
+                .unwrap_or_else(|| binding.sequence.to_lowercase().replace(' ', ""))
+        };
+        let taken = [&self.once, &self.continuous, &self.snapshot]
+            .into_iter()
+            .any(|binding| chord(binding) == chord(&self.translate_selection));
+        if taken {
+            self.translate_selection.sequence.clear();
+        }
+    }
+    /// Shortcut actions with the IDs every shortcut backend uses. The position indexes the
+    /// controller's tap counters; the settings dialog orders its rows separately.
+    pub fn bindings(&self) -> [(&'static str, &Binding); 4] {
+        [
+            ("once", &self.once),
+            ("continuous", &self.continuous),
+            ("snapshot", &self.snapshot),
+            ("translate_selection", &self.translate_selection),
+        ]
     }
     pub fn validate(&self) -> Result<()> {
         if !["custom", "codex", "claude", "opencode", "antigravity"]
@@ -152,6 +186,9 @@ impl Config {
         }
         if !["auto", "desktop", "region", "picker"].contains(&self.capture_mode.as_str()) {
             bail!("Choose a supported screenshot mode.");
+        }
+        if !["auto", "vision", "tesseract"].contains(&self.ocr_engine.as_str()) {
+            bail!("Choose Apple Vision or Tesseract for screen text recognition.");
         }
         for lang in [&self.preferred_language, &self.fallback_language] {
             if lang.trim().is_empty() || lang.len() > 64 {
@@ -172,7 +209,10 @@ impl Config {
             bail!("Tap interval must be 150–2000 ms; selection delay must be 100–3000 ms.");
         }
         let mut seen = std::collections::HashSet::new();
-        for binding in [&self.once, &self.continuous, &self.snapshot] {
+        for (id, binding) in self.bindings() {
+            if id == "translate_selection" && binding.sequence.trim().is_empty() {
+                continue;
+            }
             if !(1..=3).contains(&binding.taps) || binding.sequence.trim().is_empty() {
                 bail!("Each shortcut needs a key sequence and 1–3 presses.");
             }

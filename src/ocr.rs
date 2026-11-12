@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -81,7 +82,85 @@ pub fn executable() -> PathBuf {
         .filter(|path| path.is_file())
         .unwrap_or_else(|| PathBuf::from("tesseract"))
 }
+/// Internal option: `ranslator --vision-ocr IMAGE LANGUAGES` prints Apple Vision results as TSV.
+pub const VISION_OPTION: &str = "--vision-ocr";
+/// With [`VISION_OPTION`], prepares Vision's recognition models without an image.
+pub const WARM_UP_OPTION: &str = "--warm-up";
+
+/// The engine Snapshot uses. Apple Vision exists only in macOS builds with the native layer;
+/// other platforms keep Tesseract whatever a copied configuration requests.
+pub fn engine(config: &Config) -> &'static str {
+    if cfg!(all(target_os = "macos", not(core_only))) && config.ocr_engine != "tesseract" {
+        "vision"
+    } else {
+        "tesseract"
+    }
+}
+
 pub fn recognize(config: &Config, image: &Path, cancel: &Cancellation) -> Result<Vec<Word>> {
+    let words = if engine(config) == "vision" {
+        recognize_vision(config, image, cancel).map_err(|error| {
+            if cancel.load(Ordering::Relaxed) {
+                error
+            } else {
+                error.context(
+                    "Apple Vision could not read this image. To use the bundled engine instead, \
+                     choose Tesseract in Settings → Screen text.",
+                )
+            }
+        })?
+    } else {
+        recognize_tesseract(config, image, cancel)?
+    };
+    if words.is_empty() {
+        bail!("No readable text found. Try a closer screenshot or change the OCR language.");
+    }
+    Ok(words)
+}
+
+// A child process keeps the shared timeout and cancellation: Vision itself cannot be interrupted.
+fn recognize_vision(config: &Config, image: &Path, cancel: &Cancellation) -> Result<Vec<Word>> {
+    let mut command = Command::new(std::env::current_exe()?);
+    command
+        .arg(VISION_OPTION)
+        .arg(image)
+        .arg(&config.ocr_languages);
+    let output = process::run(
+        &mut command,
+        vec![],
+        Duration::from_secs(config.timeout_seconds),
+        cancel,
+    )?;
+    Ok(parse_tsv(
+        &String::from_utf8(output).context("OCR returned invalid UTF-8")?,
+    ))
+}
+
+/// Vision compiles its accurate recognizer on first use for each app and macOS build, which
+/// takes about a minute. Doing that in the background keeps the first Snapshot responsive.
+/// Later warm-ups find the cache and finish in a fraction of a second.
+pub fn warm_up(config: &Config) {
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+    if engine(config) != "vision" || RUNNING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let languages = config.ocr_languages.clone();
+    std::thread::spawn(move || {
+        if let Ok(exe) = std::env::current_exe() {
+            let mut command = Command::new(exe);
+            command.args([VISION_OPTION, WARM_UP_OPTION]).arg(languages);
+            let _ = process::run(
+                &mut command,
+                vec![],
+                Duration::from_secs(300),
+                &Default::default(),
+            );
+        }
+        RUNNING.store(false, Ordering::Release);
+    });
+}
+
+fn recognize_tesseract(config: &Config, image: &Path, cancel: &Cancellation) -> Result<Vec<Word>> {
     // A temporary view lets bundled, downloaded and system models work together.
     let data = tempfile::tempdir()?;
     for language in config.ocr_languages.split('+') {
@@ -113,11 +192,7 @@ pub fn recognize(config: &Config, image: &Path, cancel: &Cancellation) -> Result
         cancel,
     )?;
     let text = String::from_utf8(output).context("OCR returned invalid UTF-8")?;
-    let words = parse_tsv(&text);
-    if words.is_empty() {
-        bail!("No readable text found. Try a closer screenshot or change the OCR language.");
-    }
-    Ok(words)
+    Ok(parse_tsv(&text))
 }
 
 pub fn model_path(config: &Config, language: &str) -> Option<PathBuf> {

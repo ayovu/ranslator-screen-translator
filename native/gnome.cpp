@@ -1,4 +1,5 @@
 #include "gnome.hpp"
+#include "actions.hpp"
 #include <utility>
 #ifdef Q_OS_LINUX
 #include <QtDBus>
@@ -86,7 +87,7 @@ void GnomeDesktop::bind(const QJsonObject &shortcuts,
 #ifdef Q_OS_LINUX
     // The companion needs shortcut sequences only; never transmit provider configuration or keys.
     QJsonObject sequences;
-    for (const auto &id : {"once", "continuous", "snapshot"})
+    for (const auto &id : shortcutActions)
         sequences.insert(
             id, QJsonObject{{"sequence", shortcuts.value(id).toObject().value("sequence")}});
     const auto raw = QString::fromUtf8(QJsonDocument(sequences).toJson(QJsonDocument::Compact));

@@ -36,9 +36,29 @@ def macho(path):
                                  b'\xca\xfe\xba\xbf', b'\xbf\xba\xfe\xca')
 
 
+def install_name(path):
+    # Universal binaries print a header per architecture; bundles have no install name.
+    names = [line.strip() for line in output('otool', '-D', str(path)).splitlines() if not line.endswith(':')]
+    return names[0] if names else None
+
+
 def dependencies(path):
-    return [line.strip().split(' (compatibility version', 1)[0]
-            for line in output('otool', '-L', str(path)).splitlines()[1:] if 'compatibility version' in line]
+    # otool -L also lists a dylib's own install name; it is not a dependency.
+    own = install_name(path)
+    return [name for line in output('otool', '-L', str(path)).splitlines()[1:] if 'compatibility version' in line
+            if (name := line.strip().split(' (compatibility version', 1)[0]) != own]
+
+
+def uuids(path):
+    return sorted(re.findall(r'cmd LC_UUID\s+cmdsize \d+\s+uuid ([0-9A-F-]+)', output('otool', '-l', str(path))))
+
+
+def same_library(first, second):
+    # macdeployqt and install_name_tool rewrite load commands, so bytes differ for one library.
+    first_uuids, second_uuids = uuids(first), uuids(second)
+    if first_uuids and second_uuids:
+        return first_uuids == second_uuids
+    return hashlib.sha256(first.read_bytes()).digest() == hashlib.sha256(second.read_bytes()).digest()
 
 
 def rpaths(path):
@@ -78,12 +98,14 @@ while queue:
         continue
     visited.add(binary)
     original = origins.get(binary, binary)
+    if (own := install_name(binary)) and own.startswith(('/opt/', '/usr/local/', '/Users/')):
+        subprocess.run(['install_name_tool', '-id', '@rpath/' + binary.name, str(binary)], check=True)
     for dependency in dependencies(binary):
         if dependency.startswith(('/System/Library/', '/usr/lib/')):
             continue
         source = locate(dependency, original)
         if source.resolve() == binary.resolve():
-            # otool includes a dylib's own install name; it is not a dependency.
+            # A dylib can also name its own install path; it is not a dependency.
             continue
         if source.is_relative_to(app):
             destination = source
@@ -93,7 +115,7 @@ while queue:
             destination = frameworks / source.name
             if destination.exists():
                 prior = origins.get(destination, destination)
-                if hashlib.sha256(prior.read_bytes()).digest() != hashlib.sha256(source.read_bytes()).digest():
+                if not same_library(prior, source):
                     raise RuntimeError(f'Different libraries have the same bundle filename: {source}')
             else:
                 shutil.copy2(source.resolve(), destination)
@@ -115,6 +137,8 @@ for binary in visited:
         assert not dependency.startswith(('/opt/', '/usr/local/', '/Users/')), f'External library in {binary}: {dependency}'
         if not dependency.startswith(('/System/Library/', '/usr/lib/')):
             locate(dependency, binary)
+    if own := install_name(binary):
+        assert not own.startswith(('/opt/', '/usr/local/', '/Users/')), f'External install name in {binary}: {own}'
     load_commands = output('otool', '-l', str(binary))
     for block in re.split(r'Load command \d+\n', load_commands):
         field = 'minos' if 'cmd LC_BUILD_VERSION\n' in block else 'version' if 'cmd LC_VERSION_MIN_MACOSX\n' in block else None

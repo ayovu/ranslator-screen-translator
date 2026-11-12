@@ -1,4 +1,5 @@
 #include "x11.hpp"
+#include "actions.hpp"
 #include <QGuiApplication>
 #include <QKeySequence>
 #include <QSet>
@@ -171,8 +172,10 @@ struct X11Shortcuts::State {
     void bind() {
         unbind();
         initializeLocks();
-        for (const auto &id : {"once", "continuous", "snapshot"}) {
+        for (const auto &id : shortcutActions) {
             auto sequence = config[id].toObject()["sequence"].toString();
+            if (sequence.trimmed().isEmpty())
+                continue;
             if (const auto chord = modifierChord(sequence)) {
                 if (xiOpcode)
                     modifierBindings.insert(chord, id);
