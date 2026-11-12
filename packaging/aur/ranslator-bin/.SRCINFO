@@ -1,0 +1,35 @@
+pkgbase = ranslator-bin
+	pkgdesc = Translate selected and on-screen text with OCR and floating popups
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/ayovu/ranslator-screen-translator
+	arch = x86_64
+	license = GPL-3.0-only
+	depends = bash
+	depends = coreutils
+	depends = dbus
+	depends = fontconfig
+	depends = freetype2
+	depends = glibc
+	depends = hicolor-icon-theme
+	depends = libgcc
+	depends = libstdc++
+	depends = libglvnd
+	depends = libx11
+	depends = libxcb
+	depends = wayland
+	depends = zlib
+	optdepends = spectacle: KDE Plasma screen capture
+	optdepends = xdg-desktop-portal: desktop capture and shortcuts with a compatible portal backend
+	optdepends = at-spi2-core: selected text from accessible applications
+	optdepends = ollama: local AI translation models
+	provides = ranslator=0.1.0
+	conflicts = ranslator
+	options = !strip
+	options = !debug
+	source = https://github.com/ayovu/ranslator-screen-translator/releases/download/v0.1.0/Ranslator-0.1.0-linux-x86_64.tar.gz
+	source = LICENSE
+	sha256sums = 7c086ef5c13ec07403c485669a48ca8f4c511bd355e4b85bd4f03be8539a0ce1
+	sha256sums = 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+
+pkgname = ranslator-bin

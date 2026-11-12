@@ -66,16 +66,19 @@ verify that it matches the source used to build your attachments. See GitHub's
 
 ## AUR
 
-Not published yet. AUR hosts installation recipes, not release binaries. After a
-public tagged GitHub release, a proposed `ranslator-bin` package can download a
-versioned Linux artifact with a fixed checksum; a source-built `ranslator` package
-is another option. Confirm name availability before submission.
+Not published yet. The [AUR recipe and publishing guide](../packaging/aur/README.md)
+provide `ranslator-bin` for the public v0.1.0 x86_64 prerelease. It downloads the
+versioned portable archive with a fixed SHA-256 and installs its private runtime
+under `/usr/lib/ranslator`. AUR stores the recipe, not the binary release.
 
-Prepare and test `PKGBUILD`, check dependencies and licenses in a clean Arch build,
-run `namcap`, and generate `.SRCINFO` with `makepkg --printsrcinfo`. Submit through
-the maintainer's own AUR account and SSH key. Each release needs updated metadata
-and checksums. See the [AUR submission guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines)
-and [.SRCINFO documentation](https://wiki.archlinux.org/title/.SRCINFO).
+Publication is paused: as of 2026-10-19, AUR has closed new account registration
+and offers no manual registration queue. Keep the recipe for later and use
+GitHub release downloads in the meantime. Follow the linked guide once an account
+is available to add a dedicated SSH key, validate the package and submit through
+the maintainer's own account. Confirm name
+availability before submission. Each release needs updated metadata and checksums;
+GitHub releases do not update AUR automatically. A source-built `ranslator`
+package can be added separately later.
 
 ## Flathub
 

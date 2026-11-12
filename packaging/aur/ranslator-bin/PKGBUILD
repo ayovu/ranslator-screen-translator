@@ -1,0 +1,46 @@
+# Prebuilt upstream release; keep bundled libraries private under /usr/lib/ranslator.
+pkgname=ranslator-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Translate selected and on-screen text with OCR and floating popups'
+arch=('x86_64')
+url='https://github.com/ayovu/ranslator-screen-translator'
+license=('GPL-3.0-only')
+depends=(
+  'bash' 'coreutils' 'dbus' 'fontconfig' 'freetype2' 'glibc' 'hicolor-icon-theme'
+  'libgcc' 'libstdc++' 'libglvnd' 'libx11' 'libxcb' 'wayland' 'zlib'
+)
+optdepends=(
+  'spectacle: KDE Plasma screen capture'
+  'xdg-desktop-portal: desktop capture and shortcuts with a compatible portal backend'
+  'at-spi2-core: selected text from accessible applications'
+  'ollama: local AI translation models'
+)
+provides=("ranslator=$pkgver")
+conflicts=('ranslator')
+options=('!strip' '!debug')
+source=(
+  "$url/releases/download/v$pkgver/Ranslator-$pkgver-linux-$CARCH.tar.gz"
+  'LICENSE'
+)
+sha256sums=(
+  '7c086ef5c13ec07403c485669a48ca8f4c511bd355e4b85bd4f03be8539a0ce1'
+  '3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986'
+)
+
+package() {
+  install -d "$pkgdir/usr/lib/ranslator" "$pkgdir/usr/bin"
+  cp -a AppRun usr "$pkgdir/usr/lib/ranslator/"
+  find "$pkgdir/usr/lib/ranslator" -type d -empty -delete
+  ln -s /usr/lib/ranslator/AppRun "$pkgdir/usr/bin/ranslator"
+
+  install -Dm644 usr/share/applications/io.github.ranslator.Ranslator.desktop \
+    "$pkgdir/usr/share/applications/io.github.ranslator.Ranslator.desktop"
+  install -Dm644 usr/share/icons/hicolor/scalable/apps/io.github.ranslator.Ranslator.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.ranslator.Ranslator.svg"
+  install -Dm644 usr/share/metainfo/io.github.ranslator.Ranslator.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/io.github.ranslator.Ranslator.metainfo.xml"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  ln -s /usr/lib/ranslator/usr/share/licenses/ranslator \
+    "$pkgdir/usr/share/licenses/$pkgname/bundled"
+}
