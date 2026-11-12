@@ -31,7 +31,7 @@ fi
         cargo test --locked --all-targets
         cmake -S native -B build/portable/native-tests \
             -DRANSLATOR_FONT_TESTS=ON -DRANSLATOR_UI_TESTS=ON -DRANSLATOR_AUTOSTART_TESTS=ON
-        cmake --build build/portable/native-tests --target font_probe ui_tests autostart_tests --parallel 2
+        cmake --build build/portable/native-tests --target font_probe ui_tests autostart_tests appearance_tests --parallel 2
         ctest --test-dir build/portable/native-tests --output-on-failure
         scripts/package-appimage.sh
     '
